@@ -1,0 +1,580 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		8B43B41E2E67EF4900F58DA3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B43B4042E67EF4700F58DA3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B43B40B2E67EF4700F58DA3;
+			remoteInfo = Fabulis;
+		};
+		8B43B4282E67EF4900F58DA3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B43B4042E67EF4700F58DA3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B43B40B2E67EF4700F58DA3;
+			remoteInfo = Fabulis;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		8B43B40C2E67EF4700F58DA3 /* Fabulis.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fabulis.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8B43B41D2E67EF4900F58DA3 /* FabulisTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FabulisTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8B43B4272E67EF4900F58DA3 /* FabulisUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FabulisUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8B43B42F2E67EF4900F58DA3 /* Exceptions for "Fabulis" folder in "Fabulis" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8B43B40B2E67EF4700F58DA3 /* Fabulis */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		8B43B40E2E67EF4700F58DA3 /* Fabulis */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8B43B42F2E67EF4900F58DA3 /* Exceptions for "Fabulis" folder in "Fabulis" target */,
+			);
+			path = Fabulis;
+			sourceTree = "<group>";
+		};
+		8B43B4202E67EF4900F58DA3 /* FabulisTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FabulisTests;
+			sourceTree = "<group>";
+		};
+		8B43B42A2E67EF4900F58DA3 /* FabulisUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = FabulisUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8B43B4092E67EF4700F58DA3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B43B41A2E67EF4900F58DA3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B43B4242E67EF4900F58DA3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		8B43B4032E67EF4700F58DA3 = {
+			isa = PBXGroup;
+			children = (
+				8B43B40E2E67EF4700F58DA3 /* Fabulis */,
+				8B43B4202E67EF4900F58DA3 /* FabulisTests */,
+				8B43B42A2E67EF4900F58DA3 /* FabulisUITests */,
+				8B43B40D2E67EF4700F58DA3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8B43B40D2E67EF4700F58DA3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8B43B40C2E67EF4700F58DA3 /* Fabulis.app */,
+				8B43B41D2E67EF4900F58DA3 /* FabulisTests.xctest */,
+				8B43B4272E67EF4900F58DA3 /* FabulisUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8B43B40B2E67EF4700F58DA3 /* Fabulis */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B43B4302E67EF4900F58DA3 /* Build configuration list for PBXNativeTarget "Fabulis" */;
+			buildPhases = (
+				8B43B4082E67EF4700F58DA3 /* Sources */,
+				8B43B4092E67EF4700F58DA3 /* Frameworks */,
+				8B43B40A2E67EF4700F58DA3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8B43B40E2E67EF4700F58DA3 /* Fabulis */,
+			);
+			name = Fabulis;
+			packageProductDependencies = (
+			);
+			productName = Fabulis;
+			productReference = 8B43B40C2E67EF4700F58DA3 /* Fabulis.app */;
+			productType = "com.apple.product-type.application";
+		};
+		8B43B41C2E67EF4900F58DA3 /* FabulisTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B43B4352E67EF4900F58DA3 /* Build configuration list for PBXNativeTarget "FabulisTests" */;
+			buildPhases = (
+				8B43B4192E67EF4900F58DA3 /* Sources */,
+				8B43B41A2E67EF4900F58DA3 /* Frameworks */,
+				8B43B41B2E67EF4900F58DA3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8B43B41F2E67EF4900F58DA3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				8B43B4202E67EF4900F58DA3 /* FabulisTests */,
+			);
+			name = FabulisTests;
+			packageProductDependencies = (
+			);
+			productName = FabulisTests;
+			productReference = 8B43B41D2E67EF4900F58DA3 /* FabulisTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		8B43B4262E67EF4900F58DA3 /* FabulisUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8B43B4382E67EF4900F58DA3 /* Build configuration list for PBXNativeTarget "FabulisUITests" */;
+			buildPhases = (
+				8B43B4232E67EF4900F58DA3 /* Sources */,
+				8B43B4242E67EF4900F58DA3 /* Frameworks */,
+				8B43B4252E67EF4900F58DA3 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8B43B4292E67EF4900F58DA3 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				8B43B42A2E67EF4900F58DA3 /* FabulisUITests */,
+			);
+			name = FabulisUITests;
+			packageProductDependencies = (
+			);
+			productName = FabulisUITests;
+			productReference = 8B43B4272E67EF4900F58DA3 /* FabulisUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8B43B4042E67EF4700F58DA3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					8B43B40B2E67EF4700F58DA3 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					8B43B41C2E67EF4900F58DA3 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 8B43B40B2E67EF4700F58DA3;
+					};
+					8B43B4262E67EF4900F58DA3 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 8B43B40B2E67EF4700F58DA3;
+					};
+				};
+			};
+			buildConfigurationList = 8B43B4072E67EF4700F58DA3 /* Build configuration list for PBXProject "Fabulis" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 8B43B4032E67EF4700F58DA3;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8B43B40D2E67EF4700F58DA3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8B43B40B2E67EF4700F58DA3 /* Fabulis */,
+				8B43B41C2E67EF4900F58DA3 /* FabulisTests */,
+				8B43B4262E67EF4900F58DA3 /* FabulisUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8B43B40A2E67EF4700F58DA3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B43B41B2E67EF4900F58DA3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B43B4252E67EF4900F58DA3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8B43B4082E67EF4700F58DA3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B43B4192E67EF4900F58DA3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8B43B4232E67EF4900F58DA3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8B43B41F2E67EF4900F58DA3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8B43B40B2E67EF4700F58DA3 /* Fabulis */;
+			targetProxy = 8B43B41E2E67EF4900F58DA3 /* PBXContainerItemProxy */;
+		};
+		8B43B4292E67EF4900F58DA3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8B43B40B2E67EF4700F58DA3 /* Fabulis */;
+			targetProxy = 8B43B4282E67EF4900F58DA3 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		8B43B4312E67EF4900F58DA3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Fabulis/Fabulis.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Fabulis/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AchatesSoftware.Fabulis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8B43B4322E67EF4900F58DA3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Fabulis/Fabulis.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Fabulis/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AchatesSoftware.Fabulis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8B43B4332E67EF4900F58DA3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		8B43B4342E67EF4900F58DA3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8B43B4362E67EF4900F58DA3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AchatesSoftware.FabulisTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fabulis.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Fabulis";
+			};
+			name = Debug;
+		};
+		8B43B4372E67EF4900F58DA3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AchatesSoftware.FabulisTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Fabulis.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Fabulis";
+			};
+			name = Release;
+		};
+		8B43B4392E67EF4900F58DA3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AchatesSoftware.FabulisUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Fabulis;
+			};
+			name = Debug;
+		};
+		8B43B43A2E67EF4900F58DA3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5KAYG269JK;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AchatesSoftware.FabulisUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Fabulis;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8B43B4072E67EF4700F58DA3 /* Build configuration list for PBXProject "Fabulis" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B43B4332E67EF4900F58DA3 /* Debug */,
+				8B43B4342E67EF4900F58DA3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B43B4302E67EF4900F58DA3 /* Build configuration list for PBXNativeTarget "Fabulis" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B43B4312E67EF4900F58DA3 /* Debug */,
+				8B43B4322E67EF4900F58DA3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B43B4352E67EF4900F58DA3 /* Build configuration list for PBXNativeTarget "FabulisTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B43B4362E67EF4900F58DA3 /* Debug */,
+				8B43B4372E67EF4900F58DA3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8B43B4382E67EF4900F58DA3 /* Build configuration list for PBXNativeTarget "FabulisUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8B43B4392E67EF4900F58DA3 /* Debug */,
+				8B43B43A2E67EF4900F58DA3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 8B43B4042E67EF4700F58DA3 /* Project object */;
+}
