@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls:*)",
+      "Web(fetch:*)",
+      "Web(search)",
+      "Bash(xcodebuild:*)",
+      "Bash(xcrun:*)",
+      "Bash(swift:*)",
+      "Bash(pod:*)",
+      "Bash(xcode-select:*)"
+    ]
+  }
+}
