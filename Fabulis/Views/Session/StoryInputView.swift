@@ -12,41 +12,13 @@ struct StoryInputView: View {
 
     @State private var showingEditPrompt = false
     @State private var editedPrompt = ""
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                Button {
-                    onContinue()
-                } label: {
-                    Label("Continue", systemImage: "arrow.right.circle.fill")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isGenerating)
-
-                if canRegenerate {
-                    Button {
-                        onRegenerate()
-                    } label: {
-                        Label("Regenerate", systemImage: "arrow.clockwise")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isGenerating)
-
-                    Button {
-                        editedPrompt = lastUserPrompt ?? ""
-                        showingEditPrompt = true
-                    } label: {
-                        Label("Edit & Regenerate", systemImage: "pencil")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isGenerating)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
+            actionButtons
+                .padding(.horizontal)
+                .padding(.top, 8)
 
             HStack(spacing: 12) {
                 TextField("Guide the story...", text: $userInput, axis: .vertical)
@@ -106,6 +78,46 @@ struct StoryInputView: View {
                 }
             }
             .presentationDetents([.medium])
+        }
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        let buttons = HStack(spacing: 12) {
+            Button {
+                onContinue()
+            } label: {
+                Label("Continue", systemImage: "arrow.right.circle.fill")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isGenerating)
+
+            if canRegenerate {
+                Button {
+                    onRegenerate()
+                } label: {
+                    Label("Regenerate", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isGenerating)
+
+                Button {
+                    editedPrompt = lastUserPrompt ?? ""
+                    showingEditPrompt = true
+                } label: {
+                    Label("Edit & Regenerate", systemImage: "pencil")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isGenerating)
+            }
+
+            Spacer()
+        }
+
+        if horizontalSizeClass == .compact {
+            buttons.labelStyle(.iconOnly)
+        } else {
+            buttons.labelStyle(.titleAndIcon)
         }
     }
 }
