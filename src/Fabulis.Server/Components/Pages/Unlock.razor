@@ -1,0 +1,59 @@
+@page "/unlock"
+@using Microsoft.AspNetCore.Components.Routing
+@inject VaultService Vault
+@inject IServiceProvider Services
+@inject NavigationManager Nav
+
+<h1>Unlock Story Vault</h1>
+
+@if (ErrorMessage is not null)
+{
+    <p class="error-message">@ErrorMessage</p>
+}
+
+<div class="unlock-form">
+    <EditForm Model="this" OnValidSubmit="TryUnlock" FormName="unlock">
+        <InputText type="password" @bind-Value="Password" placeholder="Enter vault password..." />
+        <button type="submit">Unlock</button>
+    </EditForm>
+</div>
+
+<p class="empty-message">Enter a password to open your story vault. If this is your first time, the password you enter will be used to create and encrypt the vault.</p>
+
+@code {
+    [SupplyParameterFromForm]
+    private string? Password { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Vault.IsUnlocked)
+            Nav.NavigateTo("/library");
+    }
+
+    private async Task TryUnlock()
+    {
+        if (string.IsNullOrWhiteSpace(Password))
+            return;
+
+        Vault.Unlock(Password);
+
+        try
+        {
+            await using var scope = Services.CreateAsyncScope();
+            await using var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
+            await db.Database.EnsureCreatedAsync();
+            Nav.NavigateTo("/library");
+        }
+        catch (NavigationException)
+        {
+            throw; // let the framework handle the redirect
+        }
+        catch
+        {
+            Vault.Lock();
+            ErrorMessage = "Could not open the vault. Is the password correct?";
+        }
+    }
+}

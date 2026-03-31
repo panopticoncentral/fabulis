@@ -1,0 +1,52 @@
+@page "/stories/{StoryId:int}"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+@if (Story is null)
+{
+    <p>Story not found.</p>
+}
+else
+{
+    <p class="breadcrumb"><a href="/categories/@Story.CategoryId">@Story.Category.Name</a></p>
+    <h1>@Story.Title</h1>
+
+    @if (Story.Versions.Count == 0)
+    {
+        <p class="empty-message">No versions yet.</p>
+    }
+    else
+    {
+        <ul class="item-list">
+            @foreach (var version in Story.Versions.OrderByDescending(v => v.CreatedAt))
+            {
+                <li>
+                    <a href="/versions/@version.Id">@version.CreatedAt.ToString("yyyy-MM-dd HH:mm")</a>
+                    <span class="meta">@version.ModelName</span>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter]
+    public int StoryId { get; set; }
+
+    private Story? Story { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+        Story = await Db.Stories
+            .Include(s => s.Category)
+            .Include(s => s.Versions)
+            .FirstOrDefaultAsync(s => s.Id == StoryId);
+    }
+}

@@ -1,0 +1,149 @@
+@page "/categories/{CategoryId:int}"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+@if (Category is null)
+{
+    <p>Category not found.</p>
+}
+else
+{
+    <div class="page-header">
+        @if (Action == "edit")
+        {
+            <EditForm Model="this" OnValidSubmit="RenameCategory" FormName="renameCategory" class="rename-form">
+                <InputText @bind-Value="EditName" placeholder="Category name..." />
+                <button type="submit">Save</button>
+                <a href="/categories/@CategoryId" class="btn-secondary">Cancel</a>
+            </EditForm>
+        }
+        else
+        {
+            <h1>@Category.Name</h1>
+            <div class="page-actions">
+                <a href="/categories/@CategoryId?action=edit" class="btn-secondary">Rename</a>
+                <a href="/categories/@CategoryId?action=delete" class="btn-danger">Delete</a>
+            </div>
+        }
+    </div>
+
+    @if (Action == "delete")
+    {
+        <div class="confirm-bar">
+            @if (Category.Stories.Count > 0)
+            {
+                <span>This will also delete @Category.Stories.Count story(ies). Are you sure?</span>
+            }
+            else
+            {
+                <span>Delete this category?</span>
+            }
+            <EditForm Model="this" OnValidSubmit="DeleteCategory" FormName="deleteCategory">
+                <button type="submit" class="btn-danger">Yes, delete</button>
+            </EditForm>
+            <a href="/categories/@CategoryId" class="btn-secondary">Cancel</a>
+        </div>
+    }
+
+    <div class="add-form">
+        <EditForm Model="this" OnValidSubmit="AddStory" FormName="addStory">
+            <InputText @bind-Value="NewStoryTitle" placeholder="New story title..." />
+            <button type="submit">Add Story</button>
+        </EditForm>
+    </div>
+
+    @if (Category.Stories.Count == 0)
+    {
+        <p class="empty-message">No stories yet. Add one above.</p>
+    }
+    else
+    {
+        <ul class="item-list">
+            @foreach (var story in Category.Stories.OrderBy(s => s.Title))
+            {
+                <li>
+                    <a href="/stories/@story.Id">@story.Title</a>
+                    <span class="meta">@story.Versions.Count version(s)</span>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter]
+    public int CategoryId { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? Action { get; set; }
+
+    private Category? Category { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? NewStoryTitle { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? EditName { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+        await LoadCategory();
+
+        if (Action == "edit" && Category is not null)
+        {
+            EditName ??= Category.Name;
+        }
+    }
+
+    private async Task LoadCategory()
+    {
+        Category = await Db.Categories
+            .Include(c => c.Stories)
+                .ThenInclude(s => s.Versions)
+            .FirstOrDefaultAsync(c => c.Id == CategoryId);
+    }
+
+    private async Task AddStory()
+    {
+        if (string.IsNullOrWhiteSpace(NewStoryTitle) || Category is null)
+            return;
+
+        Db.Stories.Add(new Story
+        {
+            CategoryId = Category.Id,
+            Title = NewStoryTitle.Trim(),
+            CreatedAt = DateTime.UtcNow
+        });
+        await Db.SaveChangesAsync();
+
+        NewStoryTitle = null;
+        await LoadCategory();
+    }
+
+    private async Task RenameCategory()
+    {
+        if (string.IsNullOrWhiteSpace(EditName) || Category is null)
+            return;
+
+        Category.Name = EditName.Trim();
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo($"/categories/{CategoryId}");
+    }
+
+    private async Task DeleteCategory()
+    {
+        if (Category is null)
+            return;
+
+        Db.Categories.Remove(Category);
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/library");
+    }
+}

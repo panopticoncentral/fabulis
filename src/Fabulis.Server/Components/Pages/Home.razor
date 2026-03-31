@@ -1,0 +1,15 @@
+@page "/"
+@inject VaultService Vault
+@inject NavigationManager Nav
+
+<h1>Fabulis</h1>
+<p>Welcome to Fabulis — your story generator.</p>
+
+@if (Vault.IsUnlocked)
+{
+    <p><a href="/library">Go to Story Library</a></p>
+}
+else
+{
+    <p><a href="/unlock">Unlock Story Vault</a></p>
+}

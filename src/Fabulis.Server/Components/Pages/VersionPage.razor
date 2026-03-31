@@ -1,0 +1,51 @@
+@page "/versions/{VersionId:int}"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+@if (Version is null)
+{
+    <p>Version not found.</p>
+}
+else
+{
+    <p class="breadcrumb">
+        <a href="/categories/@Version.Story.CategoryId">@Version.Story.Category.Name</a>
+        &rsaquo;
+        <a href="/stories/@Version.Story.Id">@Version.Story.Title</a>
+    </p>
+    <h1>@Version.Story.Title</h1>
+    <p class="meta">@Version.ModelName &mdash; @Version.CreatedAt.ToString("yyyy-MM-dd HH:mm")</p>
+
+    <div class="conversation">
+        @foreach (var message in Version.Messages.OrderBy(m => m.SortOrder))
+        {
+            <div class="message @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
+                <div class="message-role">@message.Role</div>
+                <div class="message-content">@message.Content</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int VersionId { get; set; }
+
+    private StoryVersion? Version { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+        Version = await Db.StoryVersions
+            .Include(v => v.Story)
+                .ThenInclude(s => s.Category)
+            .Include(v => v.Messages)
+            .FirstOrDefaultAsync(v => v.Id == VersionId);
+    }
+}

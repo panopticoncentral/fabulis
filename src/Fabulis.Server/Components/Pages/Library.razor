@@ -1,0 +1,72 @@
+@page "/library"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+<h1>Story Library</h1>
+
+<div class="add-form">
+    <EditForm Model="this" OnValidSubmit="AddCategory" FormName="addCategory">
+        <InputText @bind-Value="NewCategoryName" placeholder="New category name..." />
+        <button type="submit">Add Category</button>
+    </EditForm>
+</div>
+
+@if (Categories.Count == 0)
+{
+    <p class="empty-message">No categories yet. Add one above to get started.</p>
+}
+else
+{
+    <ul class="item-list">
+        @foreach (var category in Categories)
+        {
+            <li>
+                <a href="/categories/@category.Id">@category.Name</a>
+                <span class="meta">@category.Stories.Count story(ies)</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Category> Categories { get; set; } = [];
+
+    [SupplyParameterFromForm]
+    private string? NewCategoryName { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        Categories = await Db.Categories
+            .Include(c => c.Stories)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    private async Task AddCategory()
+    {
+        if (string.IsNullOrWhiteSpace(NewCategoryName))
+            return;
+
+        Db.Categories.Add(new Category
+        {
+            Name = NewCategoryName.Trim(),
+            CreatedAt = DateTime.UtcNow
+        });
+        await Db.SaveChangesAsync();
+
+        NewCategoryName = null;
+        await LoadCategories();
+    }
+}
