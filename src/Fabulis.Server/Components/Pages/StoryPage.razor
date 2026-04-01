@@ -20,10 +20,10 @@ else
     else
     {
         <ul class="item-list">
-            @foreach (var version in Story.Versions.OrderByDescending(v => v.CreatedAt))
+            @foreach (var version in Story.Versions.OrderBy(v => v.VersionNumber))
             {
                 <li>
-                    <a href="/versions/@version.Id">@version.CreatedAt.ToString("yyyy-MM-dd HH:mm")</a>
+                    <a href="/versions/@version.Id">Version @version.VersionNumber</a>
                     <span class="meta">@version.ModelName</span>
                 </li>
             }

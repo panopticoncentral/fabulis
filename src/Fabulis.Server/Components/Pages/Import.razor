@@ -1,0 +1,75 @@
+@page "/import"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject CategoryImportService Importer
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<h1>Import Category</h1>
+
+@if (ErrorMessage is not null)
+{
+    <p class="error-message">@ErrorMessage</p>
+}
+
+@if (Result is not null)
+{
+    <div class="success-message">
+        <p>Import complete!</p>
+        <ul>
+            <li>Categories created: @Result.CategoriesCreated</li>
+            <li>Stories created: @Result.StoriesCreated</li>
+            <li>Versions created: @Result.VersionsCreated</li>
+        </ul>
+        <a href="/library">Go to Library</a>
+    </div>
+}
+
+<div class="add-form">
+    <EditForm Model="this" OnValidSubmit="RunImport" FormName="import">
+        <InputText @bind-Value="DirectoryPath" placeholder="Path to category directory..." />
+        <button type="submit" disabled="@IsImporting">
+            @(IsImporting ? "Importing..." : "Import")
+        </button>
+    </EditForm>
+</div>
+
+<p class="empty-message">Enter the full path to a category directory. The directory name becomes the category name, each subdirectory becomes a story, and markdown files become versions.</p>
+
+@code {
+    [SupplyParameterFromForm]
+    private string? DirectoryPath { get; set; }
+
+    private ImportResult? Result { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsImporting { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!Vault.IsUnlocked)
+            Nav.NavigateTo("/unlock");
+    }
+
+    private async Task RunImport()
+    {
+        if (string.IsNullOrWhiteSpace(DirectoryPath))
+            return;
+
+        ErrorMessage = null;
+        Result = null;
+        IsImporting = true;
+
+        try
+        {
+            Result = await Importer.ImportAsync(Db, DirectoryPath.Trim());
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsImporting = false;
+        }
+    }
+}
