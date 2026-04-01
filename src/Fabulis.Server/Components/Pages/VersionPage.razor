@@ -3,6 +3,7 @@
 @inject VaultService Vault
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
+@using Markdig
 
 @if (Version is null)
 {
@@ -23,13 +24,20 @@ else
         {
             <div class="message @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
                 <div class="message-role">@message.Role</div>
-                <div class="message-content">@message.Content</div>
+                <div class="message-content">@(RenderMarkdown(message.Content))</div>
             </div>
         }
     </div>
 }
 
 @code {
+    private static readonly Markdig.MarkdownPipeline Pipeline = new Markdig.MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    private MarkupString RenderMarkdown(string content) =>
+        new(Markdig.Markdown.ToHtml(content, Pipeline));
+
     [Parameter]
     public int VersionId { get; set; }
 
