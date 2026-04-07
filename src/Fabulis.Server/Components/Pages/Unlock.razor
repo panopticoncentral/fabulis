@@ -32,28 +32,6 @@
             Nav.NavigateTo("/library");
     }
 
-    private static async Task MigrateSchema(FabulisDbContext db)
-    {
-        // Add columns introduced after initial schema creation.
-        // EnsureCreatedAsync won't alter existing tables, so we do it manually.
-        string[] migrations =
-        [
-            "ALTER TABLE StoryVersions ADD COLUMN VersionNumber INTEGER NOT NULL DEFAULT 0"
-        ];
-
-        foreach (var sql in migrations)
-        {
-            try
-            {
-                await db.Database.ExecuteSqlRawAsync(sql);
-            }
-            catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 1)
-            {
-                // Column already exists — ignore
-            }
-        }
-    }
-
     private async Task TryUnlock()
     {
         if (string.IsNullOrWhiteSpace(Password))
@@ -66,7 +44,6 @@
             await using var scope = Services.CreateAsyncScope();
             await using var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
             await db.Database.EnsureCreatedAsync();
-            await MigrateSchema(db);
             Nav.NavigateTo("/library");
         }
         catch (NavigationException)

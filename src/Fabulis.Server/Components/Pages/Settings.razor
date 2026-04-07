@@ -1,0 +1,75 @@
+@page "/settings"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+<h1>Settings</h1>
+
+<section class="settings-section">
+    <h2>Library</h2>
+
+    @if (ShowClearConfirm)
+    {
+        <div class="confirm-bar">
+            <span>This will permanently delete all categories, stories, and messages. Are you sure?</span>
+            <EditForm Model="this" OnValidSubmit="ClearLibrary" FormName="clearLibrary">
+                <button type="submit" class="btn-danger">Yes, clear everything</button>
+            </EditForm>
+            <a href="/settings" class="btn-secondary">Cancel</a>
+        </div>
+    }
+    else
+    {
+        <div class="settings-item">
+            <div>
+                <strong>Clear library</strong>
+                <p class="settings-description">Delete all categories, stories, and messages.</p>
+            </div>
+            <a href="/settings?action=clear" class="btn-danger">Clear library</a>
+        </div>
+    }
+</section>
+
+<section class="settings-section">
+    <h2>Security</h2>
+
+    <div class="settings-item">
+        <div>
+            <strong>Lock vault</strong>
+            <p class="settings-description">Lock the database and require the password to be re-entered.</p>
+        </div>
+        <EditForm Model="this" OnValidSubmit="LockVault" FormName="lockVault">
+            <button type="submit" class="btn-secondary">Lock</button>
+        </EditForm>
+    </div>
+</section>
+
+@code {
+    [SupplyParameterFromQuery]
+    private string? Action { get; set; }
+
+    private bool ShowClearConfirm => Action == "clear";
+
+    protected override void OnInitialized()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+        }
+    }
+
+    private async Task ClearLibrary()
+    {
+        var categories = await Db.Categories.ToListAsync();
+        Db.Categories.RemoveRange(categories);
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/settings");
+    }
+
+    private void LockVault()
+    {
+        Vault.Lock();
+        Nav.NavigateTo("/unlock");
+    }
+}
