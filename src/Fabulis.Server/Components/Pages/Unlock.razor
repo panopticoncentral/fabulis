@@ -44,6 +44,7 @@
             await using var scope = Services.CreateAsyncScope();
             await using var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
             await db.Database.EnsureCreatedAsync();
+            await db.EnsureSchemaUpdatedAsync();
             Nav.NavigateTo("/library");
         }
         catch (NavigationException)

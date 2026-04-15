@@ -1,0 +1,198 @@
+@page "/stories/draft/{DraftId:int}"
+@rendermode InteractiveServer
+@inject DraftService Drafts
+@inject OpenRouterService OpenRouter
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Markdig
+
+@if (CurrentDraft is null)
+{
+    <p>Draft not found.</p>
+}
+else
+{
+    <p class="breadcrumb">
+        <a href="/stories/new">New Story</a>
+        &rsaquo;
+        @(CurrentDraft.Title ?? "Untitled")
+    </p>
+
+    <div class="draft-header">
+        <div>
+            <h1 class="draft-title" @onclick="() => IsEditingTitle = true">
+                @if (IsEditingTitle)
+                {
+                    <input type="text" @bind="EditTitle" @bind:event="oninput"
+                           @onblur="SaveTitle" @onkeydown="OnTitleKeyDown"
+                           style="font-size: inherit; font-weight: inherit; border: 1px solid #ccc; border-radius: 4px; padding: 0.1rem 0.3rem; width: 100%;" />
+                }
+                else
+                {
+                    @(CurrentDraft.Title ?? "Untitled")
+                }
+            </h1>
+            <p class="meta">@CurrentDraft.Storyteller.Name · @CurrentDraft.Storyteller.ModelName</p>
+        </div>
+        <div class="page-actions">
+            <a href="/stories/draft/@DraftId/save" class="btn-secondary">Save to Library</a>
+            @if (!ConfirmingDelete)
+            {
+                <button class="btn-danger" @onclick="() => ConfirmingDelete = true">Delete</button>
+            }
+            else
+            {
+                <span>Delete this draft?</span>
+                <button class="btn-danger" @onclick="DeleteDraft">Yes</button>
+                <button class="btn-secondary" @onclick="() => ConfirmingDelete = false">No</button>
+            }
+        </div>
+    </div>
+
+    <div class="conversation">
+        @foreach (var message in CurrentDraft.Messages)
+        {
+            <div class="message @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
+                <div class="message-role">@message.Role</div>
+                <div class="message-content">@(RenderMarkdown(message.Content))</div>
+            </div>
+        }
+
+        @if (StreamingContent.Length > 0)
+        {
+            <div class="message response">
+                <div class="message-role">Response</div>
+                <div class="message-content">@(RenderMarkdown(StreamingContent.ToString()))</div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input">
+        <textarea @bind="UserInput" @bind:event="oninput" placeholder="Type your message..."
+                  rows="3" disabled="@IsStreaming"
+                  @onkeydown="OnInputKeyDown"></textarea>
+        <button @onclick="SendMessage" disabled="@(IsStreaming || string.IsNullOrWhiteSpace(UserInput))">
+            @(IsStreaming ? "Generating..." : "Send")
+        </button>
+    </div>
+
+    @if (ErrorMessage is not null)
+    {
+        <p class="error-message">@ErrorMessage</p>
+    }
+}
+
+@code {
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    private MarkupString RenderMarkdown(string content) =>
+        new(Markdown.ToHtml(content, Pipeline));
+
+    [Parameter]
+    public int DraftId { get; set; }
+
+    private Draft? CurrentDraft { get; set; }
+    private string? UserInput { get; set; }
+    private bool IsStreaming { get; set; }
+    private System.Text.StringBuilder StreamingContent { get; set; } = new();
+    private string? ErrorMessage { get; set; }
+    private bool IsEditingTitle { get; set; }
+    private string? EditTitle { get; set; }
+    private bool ConfirmingDelete { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(UserInput) || CurrentDraft is null || IsStreaming)
+            return;
+
+        ErrorMessage = null;
+        var prompt = UserInput.Trim();
+        UserInput = null;
+
+        await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Prompt, prompt);
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+
+        IsStreaming = true;
+        StreamingContent.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var storyteller = CurrentDraft.Storyteller;
+            await foreach (var chunk in OpenRouter.ChatStreamAsync(
+                storyteller.ModelName,
+                storyteller.Prompt,
+                CurrentDraft.Messages.ToList(),
+                storyteller.Temperature,
+                storyteller.TopP,
+                storyteller.MaxTokens))
+            {
+                StreamingContent.Append(chunk);
+                StateHasChanged();
+            }
+
+            var fullResponse = StreamingContent.ToString();
+            await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, fullResponse);
+            CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            StreamingContent.Clear();
+            IsStreaming = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SaveTitle()
+    {
+        if (CurrentDraft is not null && !string.IsNullOrWhiteSpace(EditTitle))
+        {
+            await Drafts.UpdateDraftTitleAsync(CurrentDraft.Id, EditTitle.Trim());
+            CurrentDraft.Title = EditTitle.Trim();
+        }
+        IsEditingTitle = false;
+    }
+
+    private async Task OnTitleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveTitle();
+        }
+        else if (e.Key == "Escape")
+        {
+            IsEditingTitle = false;
+        }
+    }
+
+    private async Task DeleteDraft()
+    {
+        if (CurrentDraft is null) return;
+        await Drafts.DeleteDraftAsync(CurrentDraft.Id);
+        Nav.NavigateTo("/stories/new");
+    }
+}

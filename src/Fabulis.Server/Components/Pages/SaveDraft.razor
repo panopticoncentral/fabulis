@@ -1,0 +1,183 @@
+@page "/stories/draft/{DraftId:int}/save"
+@rendermode InteractiveServer
+@inject DraftService Drafts
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+@if (CurrentDraft is null)
+{
+    <p>Draft not found.</p>
+}
+else
+{
+    <p class="breadcrumb">
+        <a href="/stories/new">New Story</a>
+        &rsaquo;
+        <a href="/stories/draft/@DraftId">@(CurrentDraft.Title ?? "Untitled")</a>
+        &rsaquo;
+        Save to Library
+    </p>
+
+    <h1>Save to Library</h1>
+
+    <div class="detail-form">
+        <div class="form-group">
+            <label>Category</label>
+            <select @bind="SelectedCategoryId" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;">
+                <option value="0">-- New Category --</option>
+                @foreach (var cat in Categories)
+                {
+                    <option value="@cat.Id">@cat.Name</option>
+                }
+            </select>
+        </div>
+
+        @if (SelectedCategoryId == 0)
+        {
+            <div class="form-group">
+                <label>New Category Name</label>
+                <input type="text" @bind="NewCategoryName" placeholder="Category name..." />
+            </div>
+        }
+        else
+        {
+            <div class="form-group">
+                <label>Story</label>
+                <select @bind="SelectedStoryId" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;">
+                    <option value="0">-- New Story --</option>
+                    @foreach (var story in StoriesInCategory)
+                    {
+                        <option value="@story.Id">@story.Title (@story.Versions.Count version(s))</option>
+                    }
+                </select>
+            </div>
+        }
+
+        @if (SelectedStoryId == 0)
+        {
+            <div class="form-group">
+                <label>Story Title</label>
+                <input type="text" @bind="NewStoryTitle" placeholder="Story title..." />
+            </div>
+        }
+
+        <div class="form-actions">
+            <button @onclick="Save" disabled="@IsSaving"
+                    style="padding: 0.5rem 1rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">
+                @(IsSaving ? "Saving..." : "Save")
+            </button>
+            <a href="/stories/draft/@DraftId" class="btn-secondary">Cancel</a>
+        </div>
+
+        @if (ErrorMessage is not null)
+        {
+            <p class="error-message">@ErrorMessage</p>
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int DraftId { get; set; }
+
+    private Draft? CurrentDraft { get; set; }
+    private List<Category> Categories { get; set; } = [];
+    private List<Story> StoriesInCategory { get; set; } = [];
+    private int _selectedCategoryId;
+    private int SelectedCategoryId
+    {
+        get => _selectedCategoryId;
+        set
+        {
+            _selectedCategoryId = value;
+            SelectedStoryId = 0;
+            LoadStoriesInCategory();
+        }
+    }
+    private int SelectedStoryId { get; set; }
+    private string? NewCategoryName { get; set; }
+    private string? NewStoryTitle { get; set; }
+    private bool IsSaving { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+        Categories = await Db.Categories.OrderBy(c => c.Name).ToListAsync();
+        NewStoryTitle = CurrentDraft?.Title;
+    }
+
+    private void LoadStoriesInCategory()
+    {
+        if (_selectedCategoryId == 0)
+        {
+            StoriesInCategory = [];
+            return;
+        }
+        StoriesInCategory = Db.Stories
+            .Include(s => s.Versions)
+            .Where(s => s.CategoryId == _selectedCategoryId)
+            .OrderBy(s => s.Title)
+            .ToList();
+    }
+
+    private async Task Save()
+    {
+        if (CurrentDraft is null) return;
+        ErrorMessage = null;
+        IsSaving = true;
+
+        try
+        {
+            int categoryId;
+            if (SelectedCategoryId == 0)
+            {
+                if (string.IsNullOrWhiteSpace(NewCategoryName))
+                {
+                    ErrorMessage = "Please enter a category name.";
+                    return;
+                }
+                var category = new Category
+                {
+                    Name = NewCategoryName.Trim(),
+                    CreatedAt = DateTime.UtcNow
+                };
+                Db.Categories.Add(category);
+                await Db.SaveChangesAsync();
+                categoryId = category.Id;
+            }
+            else
+            {
+                categoryId = SelectedCategoryId;
+            }
+
+            int? storyId = SelectedStoryId > 0 ? SelectedStoryId : null;
+            string? storyTitle = storyId.HasValue ? null : NewStoryTitle?.Trim();
+
+            if (!storyId.HasValue && string.IsNullOrWhiteSpace(storyTitle))
+            {
+                ErrorMessage = "Please enter a story title.";
+                return;
+            }
+
+            var version = await Drafts.SaveToLibraryAsync(CurrentDraft.Id, categoryId, storyId, storyTitle);
+            Nav.NavigateTo($"/versions/{version.Id}");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+}

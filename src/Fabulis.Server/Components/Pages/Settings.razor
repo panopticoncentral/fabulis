@@ -1,10 +1,87 @@
 @page "/settings"
 @inject FabulisDbContext Db
 @inject VaultService Vault
+@inject OpenRouterService OpenRouter
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
 
 <h1>Settings</h1>
+
+<section class="settings-section">
+    <h2>API</h2>
+
+    <div class="settings-item">
+        <div>
+            <strong>OpenRouter API key</strong>
+            <p class="settings-description">Required for story generation. Stored encrypted in the database.</p>
+        </div>
+        <EditForm Model="this" OnValidSubmit="SaveApiKey" FormName="saveApiKey" class="add-form">
+            <InputText type="password" @bind-Value="ApiKey" placeholder="@ApiKeyPlaceholder" />
+            <button type="submit">Save</button>
+        </EditForm>
+    </div>
+
+    @if (ApiKeySaved)
+    {
+        <p style="color: green; font-size: 0.9rem;">API key saved.</p>
+    }
+
+    <div class="settings-item-vertical">
+        <div>
+            <strong>Assistant model</strong>
+            <p class="settings-description">Model used for the prompt-writing assistant on the Storytellers page.</p>
+        </div>
+
+        @if (CurrentAssistantModel is not null)
+        {
+            <p class="settings-current">Current: <strong>@CurrentAssistantModel</strong></p>
+        }
+
+        <div class="model-picker">
+            <div class="model-picker-search">
+                <input type="text" @bind="ModelSearch" @bind:event="oninput" placeholder="Search models..." />
+                @if (Models.Count == 0 && !IsLoadingModels)
+                {
+                    <button type="button" @onclick="LoadModels" disabled="@IsLoadingModels">
+                        Load Models
+                    </button>
+                }
+            </div>
+
+            @if (IsLoadingModels)
+            {
+                <p class="form-hint">Loading models from OpenRouter...</p>
+            }
+            else if (ModelsError is not null)
+            {
+                <p class="error-message">@ModelsError</p>
+            }
+            else if (Models.Count > 0)
+            {
+                <div class="model-picker-list">
+                    @foreach (var model in FilteredModels)
+                    {
+                        <div class="model-picker-item @(model.Id == SelectedModelId ? "selected" : "")"
+                             @onclick="() => SelectModel(model.Id)">
+                            <span class="model-picker-id">@model.Id</span>
+                            <span class="model-picker-name">@model.Name</span>
+                        </div>
+                    }
+                    @if (FilteredModels.Count == 0)
+                    {
+                        <p class="empty-message" style="padding: 0.5rem;">No models match your search.</p>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (AssistantModelSaved)
+        {
+            <p style="color: green; font-size: 0.9rem;">Assistant model saved.</p>
+        }
+    </div>
+</section>
 
 <section class="settings-section">
     <h2>Library</h2>
@@ -51,12 +128,86 @@
 
     private bool ShowClearConfirm => Action == "clear";
 
-    protected override void OnInitialized()
+    [SupplyParameterFromForm]
+    private string? ApiKey { get; set; }
+
+    private string ApiKeyPlaceholder { get; set; } = "sk-or-...";
+    private bool ApiKeySaved { get; set; }
+
+    private string? CurrentAssistantModel { get; set; }
+    private bool AssistantModelSaved { get; set; }
+
+    private List<ModelInfo> Models { get; set; } = [];
+    private bool IsLoadingModels { get; set; }
+    private string? ModelsError { get; set; }
+    private string? ModelSearch { get; set; }
+    private string? SelectedModelId { get; set; }
+
+    private List<ModelInfo> FilteredModels =>
+        string.IsNullOrWhiteSpace(ModelSearch)
+            ? Models
+            : Models.Where(m =>
+                m.Id.Contains(ModelSearch, StringComparison.OrdinalIgnoreCase) ||
+                m.Name.Contains(ModelSearch, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
     {
         if (!Vault.IsUnlocked)
         {
             Nav.NavigateTo("/unlock");
+            return;
         }
+
+        var existingKey = await Db.AppSettings.FindAsync("OpenRouterApiKey");
+        if (existingKey is not null)
+        {
+            ApiKeyPlaceholder = "••••••••  (key is set)";
+        }
+
+        var existingModel = await Db.AppSettings.FindAsync("AssistantModel");
+        if (existingModel is not null)
+        {
+            CurrentAssistantModel = existingModel.Value;
+        }
+    }
+
+    private async Task LoadModels()
+    {
+        IsLoadingModels = true;
+        ModelsError = null;
+
+        try
+        {
+            Models = await OpenRouter.GetModelsAsync();
+        }
+        catch (Exception ex)
+        {
+            ModelsError = ex.Message;
+        }
+        finally
+        {
+            IsLoadingModels = false;
+        }
+    }
+
+    private async Task SelectModel(string modelId)
+    {
+        SelectedModelId = modelId;
+
+        var existing = await Db.AppSettings.FindAsync("AssistantModel");
+        if (existing is not null)
+        {
+            existing.Value = modelId;
+        }
+        else
+        {
+            Db.AppSettings.Add(new AppSetting { Key = "AssistantModel", Value = modelId });
+        }
+
+        await Db.SaveChangesAsync();
+        CurrentAssistantModel = modelId;
+        AssistantModelSaved = true;
     }
 
     private async Task ClearLibrary()
@@ -65,6 +216,27 @@
         Db.Categories.RemoveRange(categories);
         await Db.SaveChangesAsync();
         Nav.NavigateTo("/settings");
+    }
+
+    private async Task SaveApiKey()
+    {
+        if (string.IsNullOrWhiteSpace(ApiKey))
+            return;
+
+        var existing = await Db.AppSettings.FindAsync("OpenRouterApiKey");
+        if (existing is not null)
+        {
+            existing.Value = ApiKey.Trim();
+        }
+        else
+        {
+            Db.AppSettings.Add(new AppSetting { Key = "OpenRouterApiKey", Value = ApiKey.Trim() });
+        }
+
+        await Db.SaveChangesAsync();
+        ApiKey = null;
+        ApiKeyPlaceholder = "••••••••  (key is set)";
+        ApiKeySaved = true;
     }
 
     private void LockVault()

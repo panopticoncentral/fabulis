@@ -1,0 +1,45 @@
+@page "/storytellers"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+<h1>Storytellers</h1>
+
+<div class="page-actions" style="margin-bottom: 1.5rem;">
+    <a href="/storytellers/new" class="btn-secondary">New Storyteller</a>
+</div>
+
+@if (StorytellerList.Count == 0)
+{
+    <p class="empty-message">No storytellers yet. Create one to define a persona for story generation.</p>
+}
+else
+{
+    <ul class="item-list">
+        @foreach (var storyteller in StorytellerList)
+        {
+            <li>
+                <a href="/storytellers/@storyteller.Id">@storyteller.Name</a>
+                <span class="meta">@storyteller.ModelName · temp @storyteller.Temperature</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Storyteller> StorytellerList { get; set; } = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+
+        StorytellerList = await Db.Storytellers
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+    }
+}

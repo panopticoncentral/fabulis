@@ -270,6 +270,172 @@ main {
     margin-bottom: 1rem;
 }
 
+.detail-form {
+    max-width: 600px;
+}
+
+.detail-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.detail-form label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.detail-form input[type="text"],
+.detail-form input[type="number"],
+.detail-form input[type="password"],
+.detail-form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.detail-form textarea {
+    font-family: inherit;
+    resize: vertical;
+}
+
+.detail-form .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.form-hint {
+    font-size: 0.85rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+
+.prompt-assistant {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8f8ff;
+    border: 1px solid #e0e0ee;
+    border-radius: 4px;
+}
+
+.prompt-assistant-input {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.prompt-assistant-input input[type="text"] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.prompt-assistant-input button {
+    padding: 0.5rem 0.75rem;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.prompt-assistant-input button:hover {
+    background: #16213e;
+}
+
+.prompt-assistant-input button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.settings-item-vertical {
+    padding: 0.75rem 0;
+}
+
+.settings-current {
+    font-size: 0.9rem;
+    color: #555;
+    margin: 0.5rem 0;
+}
+
+.model-picker {
+    margin-top: 0.5rem;
+}
+
+.model-picker-search {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.model-picker-search input[type="text"] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.model-picker-search button {
+    padding: 0.5rem 0.75rem;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.model-picker-search button:hover {
+    background: #16213e;
+}
+
+.model-picker-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.model-picker-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.model-picker-item:last-child {
+    border-bottom: none;
+}
+
+.model-picker-item:hover {
+    background: #f5f5ff;
+}
+
+.model-picker-item.selected {
+    background: #e8f0fe;
+}
+
+.model-picker-id {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #1a1a2e;
+}
+
+.model-picker-name {
+    font-size: 0.8rem;
+    color: #888;
+}
+
 .settings-section {
     margin-bottom: 2rem;
 }
@@ -292,4 +458,60 @@ main {
     color: #666;
     font-size: 0.9rem;
     margin: 0.25rem 0 0;
+}
+
+.draft-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.draft-header h1 {
+    margin: 0;
+}
+
+.draft-title {
+    cursor: pointer;
+}
+
+.chat-input {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+    position: sticky;
+    bottom: 1rem;
+    background: #fff;
+    padding: 0.75rem 0;
+}
+
+.chat-input textarea {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.chat-input button {
+    padding: 0.5rem 1rem;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    align-self: flex-end;
+}
+
+.chat-input button:hover {
+    background: #16213e;
+}
+
+.chat-input button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }

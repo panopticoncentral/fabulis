@@ -1,0 +1,73 @@
+@page "/stories/new"
+@rendermode InteractiveServer
+@inject DraftService Drafts
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject NavigationManager Nav
+@using Microsoft.EntityFrameworkCore
+
+<h1>New Story</h1>
+
+<div class="detail-form" style="margin-bottom: 2rem;">
+    <h2>Start a Conversation</h2>
+    @if (StorytellerList.Count == 0)
+    {
+        <p class="empty-message">No storytellers yet. <a href="/storytellers/new">Create one</a> first.</p>
+    }
+    else
+    {
+        <div class="form-group">
+            <label>Storyteller</label>
+            <select @bind="SelectedStorytellerId" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;">
+                <option value="0">Select a storyteller...</option>
+                @foreach (var s in StorytellerList)
+                {
+                    <option value="@s.Id">@s.Name (@s.ModelName)</option>
+                }
+            </select>
+        </div>
+        <button @onclick="StartNewDraft"
+                style="padding: 0.5rem 1rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">
+            Start
+        </button>
+    }
+</div>
+
+@if (DraftList.Count > 0)
+{
+    <h2>In Progress</h2>
+    <ul class="item-list">
+        @foreach (var draft in DraftList)
+        {
+            <li>
+                <a href="/stories/draft/@draft.Id">@(draft.Title ?? "Untitled")</a>
+                <span class="meta">@draft.Storyteller.Name · @draft.Messages.Count messages · @draft.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<Storyteller> StorytellerList { get; set; } = [];
+    private List<Draft> DraftList { get; set; } = [];
+    private int SelectedStorytellerId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Nav.NavigateTo("/unlock");
+            return;
+        }
+
+        StorytellerList = await Db.Storytellers.OrderBy(s => s.Name).ToListAsync();
+        DraftList = await Drafts.GetDraftsAsync();
+    }
+
+    private async Task StartNewDraft()
+    {
+        if (SelectedStorytellerId == 0) return;
+        var draft = await Drafts.CreateDraftAsync(SelectedStorytellerId);
+        Nav.NavigateTo($"/stories/draft/{draft.Id}");
+    }
+}

@@ -18,6 +18,9 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
 });
 
 builder.Services.AddScoped<CategoryImportService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<OpenRouterService>();
+builder.Services.AddScoped<DraftService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
