@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Runtime.CompilerServices;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Data;
@@ -51,7 +52,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
     }
 
     public async IAsyncEnumerable<string> ChatStreamAsync(string model, string systemPrompt,
-        List<DraftMessage> messages, double temperature = 0.7, double? topP = null, int? maxTokens = null)
+        List<DraftMessage> messages, double temperature = 0.7, double? topP = null, int? maxTokens = null,
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
             ?? throw new InvalidOperationException("OpenRouter API key is not configured. Set it in Settings.");
@@ -90,7 +92,7 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             Content = JsonContent.Create(requestBody, options: JsonOptions)
         };
 
-        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
         using var stream = await response.Content.ReadAsStreamAsync();
@@ -98,7 +100,7 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
 
         while (true)
         {
-            var line = await reader.ReadLineAsync();
+            var line = await reader.ReadLineAsync(ct);
             if (line is null) break;
             if (!line.StartsWith("data: ")) continue;
 

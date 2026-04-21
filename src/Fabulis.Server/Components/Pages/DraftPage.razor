@@ -5,6 +5,7 @@
 @inject VaultService Vault
 @inject NavigationManager Nav
 @using Markdig
+@implements IDisposable
 
 @if (CurrentDraft is null)
 {
@@ -103,9 +104,14 @@ else
         <textarea @bind="UserInput" @bind:event="oninput" placeholder="Type your message..."
                   rows="3" disabled="@IsStreaming"
                   @onkeydown="OnInputKeyDown"></textarea>
-        <button @onclick="SendMessage" disabled="@(IsStreaming || string.IsNullOrWhiteSpace(UserInput))">
-            @(IsStreaming ? "Generating..." : "Send")
-        </button>
+        @if (IsStreaming)
+        {
+            <button @onclick="CancelGeneration">Stop</button>
+        }
+        else
+        {
+            <button @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(UserInput))">Send</button>
+        }
     </div>
 
     @if (ErrorMessage is not null)
@@ -135,6 +141,7 @@ else
     private bool ConfirmingDelete { get; set; }
     private int? EditingMessageId { get; set; }
     private string? EditingContent { get; set; }
+    private CancellationTokenSource? Cts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -257,6 +264,7 @@ else
         IsStreaming = true;
         StreamingContent.Clear();
         ErrorMessage = null;
+        Cts = new CancellationTokenSource();
         StateHasChanged();
 
         try
@@ -268,7 +276,8 @@ else
                 CurrentDraft.Messages.ToList(),
                 storyteller.Temperature,
                 storyteller.TopP,
-                storyteller.MaxTokens))
+                storyteller.MaxTokens,
+                Cts.Token))
             {
                 StreamingContent.Append(chunk);
                 StateHasChanged();
@@ -278,15 +287,43 @@ else
             await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, fullResponse);
             CurrentDraft = await Drafts.GetDraftAsync(DraftId);
         }
+        catch (OperationCanceledException)
+        {
+            if (StreamingContent.Length > 0)
+            {
+                try
+                {
+                    await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, StreamingContent.ToString());
+                    CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+                }
+                catch (Exception ex)
+                {
+                    ErrorMessage = $"Error saving partial response: {ex.Message}";
+                }
+            }
+        }
         catch (Exception ex)
         {
             ErrorMessage = $"Error: {ex.Message}";
         }
         finally
         {
+            Cts?.Dispose();
+            Cts = null;
             StreamingContent.Clear();
             IsStreaming = false;
             StateHasChanged();
         }
+    }
+
+    private void CancelGeneration()
+    {
+        Cts?.Cancel();
+    }
+
+    public void Dispose()
+    {
+        Cts?.Cancel();
+        Cts?.Dispose();
     }
 }
