@@ -476,6 +476,44 @@ main {
     cursor: pointer;
 }
 
+.message-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.message-actions button {
+    padding: 0.2rem 0.5rem;
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.message-actions button:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #333;
+}
+
+.message-editing textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.message-edit-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
 .chat-input {
     display: flex;
     gap: 0.5rem;

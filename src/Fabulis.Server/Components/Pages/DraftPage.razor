@@ -52,9 +52,41 @@ else
     <div class="conversation">
         @foreach (var message in CurrentDraft.Messages)
         {
+            var isLast = message == CurrentDraft.Messages.Last();
             <div class="message @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
                 <div class="message-role">@message.Role</div>
-                <div class="message-content">@(RenderMarkdown(message.Content))</div>
+                @if (EditingMessageId == message.Id)
+                {
+                    <div class="message-editing">
+                        <textarea @bind="EditingContent" @bind:event="oninput" rows="4"></textarea>
+                        <div class="message-edit-actions">
+                            @if (message.Role == MessageRole.Prompt)
+                            {
+                                <button class="btn-secondary" @onclick="() => SaveEditAndResubmit(message)">Save & Resubmit</button>
+                            }
+                            else
+                            {
+                                <button class="btn-secondary" @onclick="() => SaveEdit(message)">Save</button>
+                            }
+                            <button class="btn-secondary" @onclick="CancelEdit">Cancel</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="message-content">@(RenderMarkdown(message.Content))</div>
+                    @if (!IsStreaming)
+                    {
+                        <div class="message-actions">
+                            <button @onclick="() => StartEditMessage(message)">Edit</button>
+                            @if (isLast && message.Role == MessageRole.Response)
+                            {
+                                <button @onclick="RegenerateLastResponse">Regenerate</button>
+                            }
+                            <button @onclick="() => DeleteMessage(message)">Delete</button>
+                        </div>
+                    }
+                }
             </div>
         }
 
@@ -101,6 +133,8 @@ else
     private bool IsEditingTitle { get; set; }
     private string? EditTitle { get; set; }
     private bool ConfirmingDelete { get; set; }
+    private int? EditingMessageId { get; set; }
+    private string? EditingContent { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -117,46 +151,13 @@ else
         if (string.IsNullOrWhiteSpace(UserInput) || CurrentDraft is null || IsStreaming)
             return;
 
-        ErrorMessage = null;
         var prompt = UserInput.Trim();
         UserInput = null;
 
         await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Prompt, prompt);
         CurrentDraft = await Drafts.GetDraftAsync(DraftId);
 
-        IsStreaming = true;
-        StreamingContent.Clear();
-        StateHasChanged();
-
-        try
-        {
-            var storyteller = CurrentDraft.Storyteller;
-            await foreach (var chunk in OpenRouter.ChatStreamAsync(
-                storyteller.ModelName,
-                storyteller.Prompt,
-                CurrentDraft.Messages.ToList(),
-                storyteller.Temperature,
-                storyteller.TopP,
-                storyteller.MaxTokens))
-            {
-                StreamingContent.Append(chunk);
-                StateHasChanged();
-            }
-
-            var fullResponse = StreamingContent.ToString();
-            await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, fullResponse);
-            CurrentDraft = await Drafts.GetDraftAsync(DraftId);
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Error: {ex.Message}";
-        }
-        finally
-        {
-            StreamingContent.Clear();
-            IsStreaming = false;
-            StateHasChanged();
-        }
+        await SubmitToLLM();
     }
 
     private async Task OnInputKeyDown(KeyboardEventArgs e)
@@ -194,5 +195,98 @@ else
         if (CurrentDraft is null) return;
         await Drafts.DeleteDraftAsync(CurrentDraft.Id);
         Nav.NavigateTo("/stories/new");
+    }
+
+    private void StartEditMessage(DraftMessage msg)
+    {
+        EditingMessageId = msg.Id;
+        EditingContent = msg.Content;
+    }
+
+    private void CancelEdit()
+    {
+        EditingMessageId = null;
+        EditingContent = null;
+    }
+
+    private async Task SaveEdit(DraftMessage msg)
+    {
+        if (CurrentDraft is null || string.IsNullOrWhiteSpace(EditingContent)) return;
+
+        await Drafts.UpdateMessageContentAsync(msg.Id, EditingContent.Trim());
+        EditingMessageId = null;
+        EditingContent = null;
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+    }
+
+    private async Task SaveEditAndResubmit(DraftMessage msg)
+    {
+        if (CurrentDraft is null || string.IsNullOrWhiteSpace(EditingContent)) return;
+
+        await Drafts.UpdateMessageAndDeleteSubsequentAsync(msg.Id, EditingContent.Trim());
+        EditingMessageId = null;
+        EditingContent = null;
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+
+        await SubmitToLLM();
+    }
+
+    private async Task RegenerateLastResponse()
+    {
+        if (CurrentDraft is null || IsStreaming) return;
+
+        var removed = await Drafts.DeleteLastResponseAsync(CurrentDraft.Id);
+        if (!removed) return;
+
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+        await SubmitToLLM();
+    }
+
+    private async Task DeleteMessage(DraftMessage msg)
+    {
+        if (CurrentDraft is null) return;
+
+        await Drafts.DeleteMessageAndSubsequentAsync(msg.Id);
+        CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+    }
+
+    private async Task SubmitToLLM()
+    {
+        if (CurrentDraft is null || !CurrentDraft.Messages.Any()) return;
+
+        IsStreaming = true;
+        StreamingContent.Clear();
+        ErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var storyteller = CurrentDraft.Storyteller;
+            await foreach (var chunk in OpenRouter.ChatStreamAsync(
+                storyteller.ModelName,
+                storyteller.Prompt,
+                CurrentDraft.Messages.ToList(),
+                storyteller.Temperature,
+                storyteller.TopP,
+                storyteller.MaxTokens))
+            {
+                StreamingContent.Append(chunk);
+                StateHasChanged();
+            }
+
+            var fullResponse = StreamingContent.ToString();
+            await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, fullResponse);
+            CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            StreamingContent.Clear();
+            IsStreaming = false;
+            StateHasChanged();
+        }
     }
 }
