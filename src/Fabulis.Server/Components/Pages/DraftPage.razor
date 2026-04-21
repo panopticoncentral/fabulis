@@ -261,6 +261,7 @@ else
     {
         if (CurrentDraft is null || !CurrentDraft.Messages.Any()) return;
 
+        var draftId = CurrentDraft.Id;
         IsStreaming = true;
         StreamingContent.Clear();
         ErrorMessage = null;
@@ -284,7 +285,7 @@ else
             }
 
             var fullResponse = StreamingContent.ToString();
-            await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, fullResponse);
+            await Drafts.AddMessageAsync(draftId, MessageRole.Response, fullResponse);
             CurrentDraft = await Drafts.GetDraftAsync(DraftId);
         }
         catch (OperationCanceledException)
@@ -293,7 +294,7 @@ else
             {
                 try
                 {
-                    await Drafts.AddMessageAsync(CurrentDraft.Id, MessageRole.Response, StreamingContent.ToString());
+                    await Drafts.AddMessageAsync(draftId, MessageRole.Response, StreamingContent.ToString());
                     CurrentDraft = await Drafts.GetDraftAsync(DraftId);
                 }
                 catch (Exception ex)
