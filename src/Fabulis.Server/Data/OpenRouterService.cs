@@ -87,15 +87,15 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
         if (maxTokens.HasValue)
             requestBody["max_tokens"] = maxTokens.Value;
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
         {
             Content = JsonContent.Create(requestBody, options: JsonOptions)
         };
 
-        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         response.EnsureSuccessStatusCode();
 
-        using var stream = await response.Content.ReadAsStreamAsync();
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
         while (true)
