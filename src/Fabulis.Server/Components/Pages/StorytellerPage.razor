@@ -114,6 +114,24 @@ else
                 <p class="form-hint">Optional. Leave empty for provider default.</p>
             </div>
 
+            <div class="form-group">
+                <label for="minp">Min P</label>
+                <InputNumber id="minp" @bind-Value="MinP" step="0.01" min="0" max="1" />
+                <p class="form-hint">Optional. Leave empty for provider default.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="topk">Top K</label>
+                <InputNumber id="topk" @bind-Value="TopK" min="0" />
+                <p class="form-hint">Optional. Leave empty for provider default.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="topa">Top A</label>
+                <InputNumber id="topa" @bind-Value="TopA" step="0.01" min="0" max="1" />
+                <p class="form-hint">Optional. Leave empty for provider default.</p>
+            </div>
+
             <div class="form-actions">
                 <button type="submit">@(IsNew ? "Create" : "Save")</button>
                 @if (!IsNew)
@@ -160,6 +178,15 @@ else
     [SupplyParameterFromForm]
     private int? MaxTokens { get; set; }
 
+    [SupplyParameterFromForm]
+    private double? MinP { get; set; }
+
+    [SupplyParameterFromForm]
+    private int? TopK { get; set; }
+
+    [SupplyParameterFromForm]
+    private double? TopA { get; set; }
+
     private string? PromptDescription { get; set; }
     private bool IsGenerating { get; set; }
     private string? GenerateError { get; set; }
@@ -200,6 +227,9 @@ else
                 Temperature = Storyteller.Temperature;
                 TopP ??= Storyteller.TopP;
                 MaxTokens ??= Storyteller.MaxTokens;
+                MinP ??= Storyteller.MinP;
+                TopK ??= Storyteller.TopK;
+                TopA ??= Storyteller.TopA;
             }
         }
     }
@@ -273,6 +303,9 @@ else
                 Temperature = Temperature,
                 TopP = TopP,
                 MaxTokens = MaxTokens,
+                MinP = MinP,
+                TopK = TopK,
+                TopA = TopA,
                 CreatedAt = DateTime.UtcNow
             });
         }
@@ -286,6 +319,9 @@ else
             Storyteller.Temperature = Temperature;
             Storyteller.TopP = TopP;
             Storyteller.MaxTokens = MaxTokens;
+            Storyteller.MinP = MinP;
+            Storyteller.TopK = TopK;
+            Storyteller.TopA = TopA;
         }
 
         await Db.SaveChangesAsync();

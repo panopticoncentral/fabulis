@@ -13,7 +13,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
     };
 
     public async Task<string> ChatAsync(string model, string systemPrompt, string userMessage,
-        double temperature = 0.7, double? topP = null, int? maxTokens = null)
+        double temperature = 0.7, double? topP = null, int? maxTokens = null,
+        double? minP = null, int? topK = null, double? topA = null)
     {
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
             ?? throw new InvalidOperationException("OpenRouter API key is not configured. Set it in Settings.");
@@ -36,6 +37,12 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             requestBody["top_p"] = topP.Value;
         if (maxTokens.HasValue)
             requestBody["max_tokens"] = maxTokens.Value;
+        if (minP.HasValue)
+            requestBody["min_p"] = minP.Value;
+        if (topK.HasValue)
+            requestBody["top_k"] = topK.Value;
+        if (topA.HasValue)
+            requestBody["top_a"] = topA.Value;
 
         var response = await client.PostAsJsonAsync(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -53,6 +60,7 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
 
     public async IAsyncEnumerable<string> ChatStreamAsync(string model, string systemPrompt,
         List<DraftMessage> messages, double temperature = 0.7, double? topP = null, int? maxTokens = null,
+        double? minP = null, int? topK = null, double? topA = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
@@ -86,6 +94,12 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             requestBody["top_p"] = topP.Value;
         if (maxTokens.HasValue)
             requestBody["max_tokens"] = maxTokens.Value;
+        if (minP.HasValue)
+            requestBody["min_p"] = minP.Value;
+        if (topK.HasValue)
+            requestBody["top_k"] = topK.Value;
+        if (topA.HasValue)
+            requestBody["top_a"] = topA.Value;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
         {

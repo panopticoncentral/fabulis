@@ -42,6 +42,9 @@ public class FabulisDbContext : DbContext
                 Temperature REAL NOT NULL DEFAULT 0.7,
                 TopP REAL NULL,
                 MaxTokens INTEGER NULL,
+                MinP REAL NULL,
+                TopK INTEGER NULL,
+                TopA REAL NULL,
                 CreatedAt TEXT NOT NULL DEFAULT '0001-01-01 00:00:00'
             )
             """);

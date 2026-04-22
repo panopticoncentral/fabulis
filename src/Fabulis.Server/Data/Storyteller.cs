@@ -9,5 +9,8 @@ public class Storyteller
     public double Temperature { get; set; } = 0.7;
     public double? TopP { get; set; }
     public int? MaxTokens { get; set; }
+    public double? MinP { get; set; }
+    public int? TopK { get; set; }
+    public double? TopA { get; set; }
     public DateTime CreatedAt { get; set; }
 }
