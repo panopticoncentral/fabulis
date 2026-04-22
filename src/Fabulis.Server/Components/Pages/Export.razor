@@ -1,0 +1,76 @@
+@page "/export"
+@inject FabulisDbContext Db
+@inject VaultService Vault
+@inject CategoryExportService Exporter
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<h1>Export All</h1>
+
+@if (ErrorMessage is not null)
+{
+    <p class="error-message">@ErrorMessage</p>
+}
+
+@if (Result is not null)
+{
+    <div class="success-message">
+        <p>Export complete!</p>
+        <ul>
+            <li>Categories exported: @Result.CategoriesExported</li>
+            <li>Stories exported: @Result.StoriesExported</li>
+            <li>Versions exported: @Result.VersionsExported</li>
+            <li>Drafts exported: @Result.DraftsExported</li>
+        </ul>
+        <a href="/library">Go to Library</a>
+    </div>
+}
+
+<div class="add-form">
+    <EditForm Model="this" OnValidSubmit="RunExport" FormName="export">
+        <InputText @bind-Value="DirectoryPath" placeholder="Destination directory (must not exist)..." />
+        <button type="submit" disabled="@IsExporting">
+            @(IsExporting ? "Exporting..." : "Export")
+        </button>
+    </EditForm>
+</div>
+
+<p class="empty-message">Enter the full path to a directory that does not yet exist. It will be created and every category, story, version, and in-progress draft in the database will be written as markdown files.</p>
+
+@code {
+    [SupplyParameterFromForm]
+    private string? DirectoryPath { get; set; }
+
+    private ExportResult? Result { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool IsExporting { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!Vault.IsUnlocked)
+            Nav.NavigateTo("/unlock");
+    }
+
+    private async Task RunExport()
+    {
+        if (string.IsNullOrWhiteSpace(DirectoryPath))
+            return;
+
+        ErrorMessage = null;
+        Result = null;
+        IsExporting = true;
+
+        try
+        {
+            Result = await Exporter.ExportAsync(Db, DirectoryPath.Trim());
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsExporting = false;
+        }
+    }
+}
