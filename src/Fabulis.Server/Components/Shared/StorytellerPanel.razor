@@ -1,0 +1,50 @@
+<aside class="storyteller-panel">
+    <p class="label">Storyteller</p>
+    <div class="card" style="margin-bottom: var(--space-4);">
+        <h3 style="margin: 0 0 var(--space-1);">@Storyteller.Name</h3>
+        <span class="chip chip-gilt">@Storyteller.ModelName</span>
+        <div style="margin-top: var(--space-3); border-top: 1px solid var(--linen); padding-top: var(--space-3);">
+            <div class="param-row"><span>Temperature</span><strong>@Storyteller.Temperature.ToString("0.00")</strong></div>
+            @if (Storyteller.TopP is not null)
+            {
+                <div class="param-row"><span>Top P</span><strong>@Storyteller.TopP.Value.ToString("0.00")</strong></div>
+            }
+            @if (Storyteller.MinP is not null)
+            {
+                <div class="param-row"><span>Min P</span><strong>@Storyteller.MinP.Value.ToString("0.00")</strong></div>
+            }
+            @if (Storyteller.TopK is not null)
+            {
+                <div class="param-row"><span>Top K</span><strong>@Storyteller.TopK</strong></div>
+            }
+            @if (Storyteller.TopA is not null)
+            {
+                <div class="param-row"><span>Top A</span><strong>@Storyteller.TopA.Value.ToString("0.00")</strong></div>
+            }
+            @if (Storyteller.MaxTokens is not null)
+            {
+                <div class="param-row"><span>Max Tokens</span><strong>@Storyteller.MaxTokens</strong></div>
+            }
+        </div>
+    </div>
+
+    <p class="label">Prompt</p>
+    <div class="card card-muted" style="font-family: var(--font-serif); font-style: italic; font-size: 0.9rem; color: var(--ink-muted); line-height: 1.55; font-variation-settings: 'SOFT' 50;">
+        @(TruncatePrompt(Storyteller.Prompt))
+    </div>
+
+    <p style="margin-top: var(--space-3);">
+        <a href="/storytellers/@Storyteller.Id" class="btn btn-ghost btn-sm">Edit storyteller</a>
+    </p>
+</aside>
+
+@code {
+    [Parameter, EditorRequired] public Storyteller Storyteller { get; set; } = null!;
+
+    private static string TruncatePrompt(string prompt)
+    {
+        if (string.IsNullOrWhiteSpace(prompt)) return string.Empty;
+        var trimmed = prompt.Trim();
+        return trimmed.Length > 320 ? trimmed[..320].TrimEnd() + "…" : trimmed;
+    }
+}

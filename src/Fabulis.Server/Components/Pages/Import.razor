@@ -5,7 +5,9 @@
 @inject NavigationManager Nav
 @rendermode InteractiveServer
 
-<h1>Import Category</h1>
+<PageHeader Title="Import Category">
+    <Subtitle>Read a folder of markdown files into a category.</Subtitle>
+</PageHeader>
 
 @if (ErrorMessage is not null)
 {
@@ -15,26 +17,31 @@
 @if (Result is not null)
 {
     <div class="success-message">
-        <p>Import complete!</p>
+        <p><strong>Import complete.</strong></p>
         <ul>
             <li>Categories created: @Result.CategoriesCreated</li>
             <li>Stories created: @Result.StoriesCreated</li>
             <li>Versions created: @Result.VersionsCreated</li>
         </ul>
-        <a href="/library">Go to Library</a>
+        <a href="/library" class="btn btn-secondary">Go to library</a>
     </div>
 }
 
-<div class="add-form">
+<div class="card" style="max-width: 640px;">
     <EditForm Model="this" OnValidSubmit="RunImport" FormName="import">
-        <InputText @bind-Value="DirectoryPath" placeholder="Path to category directory..." />
-        <button type="submit" disabled="@IsImporting">
-            @(IsImporting ? "Importing..." : "Import")
+        <div class="field">
+            <label for="import-path">Category directory</label>
+            <InputText id="import-path" @bind-Value="DirectoryPath" placeholder="/path/to/category" />
+            <p class="field-hint">
+                Enter the full path to a category directory. The directory name becomes the category name;
+                each subdirectory becomes a story; markdown files become versions.
+            </p>
+        </div>
+        <button type="submit" class="btn btn-primary" disabled="@IsImporting">
+            @(IsImporting ? "Importing…" : "Import")
         </button>
     </EditForm>
 </div>
-
-<p class="empty-message">Enter the full path to a category directory. The directory name becomes the category name, each subdirectory becomes a story, and markdown files become versions.</p>
 
 @code {
     [SupplyParameterFromForm]

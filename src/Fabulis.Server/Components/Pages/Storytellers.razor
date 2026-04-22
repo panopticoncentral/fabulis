@@ -4,27 +4,33 @@
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 
-<h1>Storytellers</h1>
-
-<div class="page-actions" style="margin-bottom: 1.5rem;">
-    <a href="/storytellers/new" class="btn-secondary">New Storyteller</a>
-</div>
+<PageHeader Title="Storytellers">
+    <Subtitle>@StorytellerList.Count @(StorytellerList.Count == 1 ? "persona" : "personas")</Subtitle>
+    <Actions>
+        <a href="/storytellers/new" class="btn btn-primary">+ New storyteller</a>
+    </Actions>
+</PageHeader>
 
 @if (StorytellerList.Count == 0)
 {
-    <p class="empty-message">No storytellers yet. Create one to define a persona for story generation.</p>
+    <EmptyState Title="No storytellers yet" Body="Create a persona to define a voice, a prompt, and sampling parameters for story generation." />
 }
 else
 {
-    <ul class="item-list">
-        @foreach (var storyteller in StorytellerList)
+    <div class="card-grid">
+        @foreach (var s in StorytellerList)
         {
-            <li>
-                <a href="/storytellers/@storyteller.Id">@storyteller.Name</a>
-                <span class="meta">@storyteller.ModelName · temp @storyteller.Temperature</span>
-            </li>
+            <a href="/storytellers/@s.Id" class="story-card">
+                <div class="story-eyebrow">Storyteller</div>
+                <h3 class="story-title">@s.Name</h3>
+                <p class="story-excerpt">@TruncatePrompt(s.Prompt)</p>
+                <div class="story-meta">
+                    <span class="chip chip-gilt">@s.ModelName</span>
+                    <span>temp @s.Temperature.ToString("0.00")</span>
+                </div>
+            </a>
         }
-    </ul>
+    </div>
 }
 
 @code {
@@ -41,5 +47,12 @@ else
         StorytellerList = await Db.Storytellers
             .OrderBy(s => s.Name)
             .ToListAsync();
+    }
+
+    private static string TruncatePrompt(string prompt)
+    {
+        if (string.IsNullOrWhiteSpace(prompt)) return string.Empty;
+        var trimmed = prompt.Trim();
+        return trimmed.Length > 160 ? trimmed[..160].TrimEnd() + "…" : trimmed;
     }
 }

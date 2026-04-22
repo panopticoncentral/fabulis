@@ -1,0 +1,44 @@
+<a href="/stories/@Story.Id" class="story-card">
+    <div class="story-eyebrow">@Eyebrow</div>
+    <h3 class="story-title">@Story.Title</h3>
+    @if (!string.IsNullOrEmpty(Excerpt))
+    {
+        <p class="story-excerpt">@Excerpt</p>
+    }
+    <div class="story-meta">
+        <span>@VersionsText</span>
+        @if (LastEdited is not null)
+        {
+            <span>@FormatDate(LastEdited.Value)</span>
+        }
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public Story Story { get; set; } = null!;
+    [Parameter] public string? CategoryName { get; set; }
+
+    private string Eyebrow =>
+        (CategoryName ?? Story.Category?.Name ?? "Story")
+        + " · "
+        + VersionsText;
+
+    private string VersionsText =>
+        Story.Versions.Count == 1 ? "1 version" : $"{Story.Versions.Count} versions";
+
+    private string? Excerpt => null;
+
+    private DateTime? LastEdited =>
+        Story.Versions.Count > 0
+            ? Story.Versions.Max(v => v.CreatedAt)
+            : Story.CreatedAt;
+
+    private static string FormatDate(DateTime dt)
+    {
+        var delta = DateTime.UtcNow - dt;
+        if (delta.TotalMinutes < 60) return "just now";
+        if (delta.TotalHours < 24) return $"{(int)delta.TotalHours}h ago";
+        if (delta.TotalDays < 7) return $"{(int)delta.TotalDays}d ago";
+        return dt.ToLocalTime().ToString("yyyy-MM-dd");
+    }
+}

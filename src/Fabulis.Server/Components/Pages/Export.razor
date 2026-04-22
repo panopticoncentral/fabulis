@@ -5,7 +5,9 @@
 @inject NavigationManager Nav
 @rendermode InteractiveServer
 
-<h1>Export All</h1>
+<PageHeader Title="Export All">
+    <Subtitle>Write every category, story, version, and draft as markdown files.</Subtitle>
+</PageHeader>
 
 @if (ErrorMessage is not null)
 {
@@ -15,27 +17,33 @@
 @if (Result is not null)
 {
     <div class="success-message">
-        <p>Export complete!</p>
+        <p><strong>Export complete.</strong></p>
         <ul>
             <li>Categories exported: @Result.CategoriesExported</li>
             <li>Stories exported: @Result.StoriesExported</li>
             <li>Versions exported: @Result.VersionsExported</li>
             <li>Drafts exported: @Result.DraftsExported</li>
         </ul>
-        <a href="/library">Go to Library</a>
+        <a href="/library" class="btn btn-secondary">Go to library</a>
     </div>
 }
 
-<div class="add-form">
+<div class="card" style="max-width: 640px;">
     <EditForm Model="this" OnValidSubmit="RunExport" FormName="export">
-        <InputText @bind-Value="DirectoryPath" placeholder="Destination directory (must not exist)..." />
-        <button type="submit" disabled="@IsExporting">
-            @(IsExporting ? "Exporting..." : "Export")
+        <div class="field">
+            <label for="export-path">Destination directory</label>
+            <InputText id="export-path" @bind-Value="DirectoryPath" placeholder="/path/to/new-directory" />
+            <p class="field-hint">
+                Enter the full path to a directory that does not yet exist. It will be created
+                and every category, story, version, and in-progress draft in the database will
+                be written as markdown files.
+            </p>
+        </div>
+        <button type="submit" class="btn btn-primary" disabled="@IsExporting">
+            @(IsExporting ? "Exporting…" : "Export")
         </button>
     </EditForm>
 </div>
-
-<p class="empty-message">Enter the full path to a directory that does not yet exist. It will be created and every category, story, version, and in-progress draft in the database will be written as markdown files.</p>
 
 @code {
     [SupplyParameterFromForm]

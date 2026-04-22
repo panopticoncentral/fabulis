@@ -6,28 +6,35 @@
 
 @if (Category is null)
 {
-    <p>Category not found.</p>
+    <PageHeader Title="Category not found" />
 }
 else
 {
-    <div class="page-header">
-        @if (Action == "edit")
-        {
-            <EditForm Model="this" OnValidSubmit="RenameCategory" FormName="renameCategory" class="rename-form">
-                <InputText @bind-Value="EditName" placeholder="Category name..." />
-                <button type="submit">Save</button>
-                <a href="/categories/@CategoryId" class="btn-secondary">Cancel</a>
-            </EditForm>
-        }
-        else
-        {
-            <h1>@Category.Name</h1>
-            <div class="page-actions">
-                <a href="/categories/@CategoryId?action=edit" class="btn-secondary">Rename</a>
-                <a href="/categories/@CategoryId?action=delete" class="btn-danger">Delete</a>
-            </div>
-        }
-    </div>
+    <PageHeader>
+        <Breadcrumb><a href="/library">Library</a></Breadcrumb>
+        <TitleContent>
+            @if (Action == "edit")
+            {
+                <EditForm Model="this" OnValidSubmit="RenameCategory" FormName="renameCategory" class="inline-add" style="margin: 0;">
+                    <InputText @bind-Value="EditName" placeholder="Category name…" />
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="/categories/@CategoryId" class="btn btn-secondary">Cancel</a>
+                </EditForm>
+            }
+            else
+            {
+                @Category.Name
+            }
+        </TitleContent>
+        <Subtitle>@Category.Stories.Count @(Category.Stories.Count == 1 ? "story" : "stories")</Subtitle>
+        <Actions>
+            @if (Action != "edit")
+            {
+                <a href="/categories/@CategoryId?action=edit" class="btn btn-secondary">Rename</a>
+                <a href="/categories/@CategoryId?action=delete" class="btn btn-danger">Delete</a>
+            }
+        </Actions>
+    </PageHeader>
 
     @if (Action == "delete")
     {
@@ -40,35 +47,32 @@ else
             {
                 <span>Delete this category?</span>
             }
-            <EditForm Model="this" OnValidSubmit="DeleteCategory" FormName="deleteCategory">
-                <button type="submit" class="btn-danger">Yes, delete</button>
+            <EditForm Model="this" OnValidSubmit="DeleteCategory" FormName="deleteCategory" style="margin: 0;">
+                <button type="submit" class="btn btn-danger">Yes, delete</button>
             </EditForm>
-            <a href="/categories/@CategoryId" class="btn-secondary">Cancel</a>
+            <a href="/categories/@CategoryId" class="btn btn-secondary">Cancel</a>
         </div>
     }
 
-    <div class="add-form">
-        <EditForm Model="this" OnValidSubmit="AddStory" FormName="addStory">
-            <InputText @bind-Value="NewStoryTitle" placeholder="New story title..." />
-            <button type="submit">Add Story</button>
+    <div class="card" style="margin-bottom: var(--space-5);">
+        <EditForm Model="this" OnValidSubmit="AddStory" FormName="addStory" class="inline-add">
+            <InputText @bind-Value="NewStoryTitle" placeholder="New story title…" />
+            <button type="submit" class="btn btn-primary">Add story</button>
         </EditForm>
     </div>
 
     @if (Category.Stories.Count == 0)
     {
-        <p class="empty-message">No stories yet. Add one above.</p>
+        <EmptyState Title="No stories yet" Body="Add a story above, or start a draft from &ldquo;+ New Story&rdquo; and save it here." />
     }
     else
     {
-        <ul class="item-list">
+        <div class="card-grid">
             @foreach (var story in Category.Stories.OrderBy(s => s.Title))
             {
-                <li>
-                    <a href="/stories/@story.Id">@story.Title</a>
-                    <span class="meta">@story.Versions.Count version(s)</span>
-                </li>
+                <StoryCard Story="story" CategoryName="@Category.Name" />
             }
-        </ul>
+        </div>
     }
 }
 

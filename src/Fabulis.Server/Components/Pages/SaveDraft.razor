@@ -8,24 +8,24 @@
 
 @if (CurrentDraft is null)
 {
-    <p>Draft not found.</p>
+    <PageHeader Title="Draft not found" />
 }
 else
 {
-    <p class="breadcrumb">
-        <a href="/stories/new">New Story</a>
-        &rsaquo;
-        <a href="/stories/draft/@DraftId">@(CurrentDraft.Title ?? "Untitled")</a>
-        &rsaquo;
-        Save to Library
-    </p>
+    <PageHeader Title="Save to Library">
+        <Breadcrumb>
+            <a href="/stories/new">New Story</a>
+            &rsaquo;
+            <a href="/stories/draft/@DraftId">@(CurrentDraft.Title ?? "Untitled")</a>
+            &rsaquo;
+            Save
+        </Breadcrumb>
+    </PageHeader>
 
-    <h1>Save to Library</h1>
-
-    <div class="detail-form">
-        <div class="form-group">
+    <div class="card" style="max-width: 640px;">
+        <div class="field">
             <label>Category</label>
-            <select @bind="SelectedCategoryId" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;">
+            <select @bind="SelectedCategoryId">
                 <option value="0">-- New Category --</option>
                 @foreach (var cat in Categories)
                 {
@@ -36,16 +36,16 @@ else
 
         @if (SelectedCategoryId == 0)
         {
-            <div class="form-group">
-                <label>New Category Name</label>
-                <input type="text" @bind="NewCategoryName" placeholder="Category name..." />
+            <div class="field">
+                <label>New category name</label>
+                <input type="text" @bind="NewCategoryName" placeholder="Category name…" />
             </div>
         }
         else
         {
-            <div class="form-group">
+            <div class="field">
                 <label>Story</label>
-                <select @bind="SelectedStoryId" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;">
+                <select @bind="SelectedStoryId">
                     <option value="0">-- New Story --</option>
                     @foreach (var story in StoriesInCategory)
                     {
@@ -57,18 +57,17 @@ else
 
         @if (SelectedStoryId == 0)
         {
-            <div class="form-group">
-                <label>Story Title</label>
-                <input type="text" @bind="NewStoryTitle" placeholder="Story title..." />
+            <div class="field">
+                <label>Story title</label>
+                <input type="text" @bind="NewStoryTitle" placeholder="Story title…" />
             </div>
         }
 
-        <div class="form-actions">
-            <button @onclick="Save" disabled="@IsSaving"
-                    style="padding: 0.5rem 1rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">
-                @(IsSaving ? "Saving..." : "Save")
+        <div style="display: flex; gap: var(--space-2);">
+            <button class="btn btn-primary" @onclick="Save" disabled="@IsSaving">
+                @(IsSaving ? "Saving…" : "Save")
             </button>
-            <a href="/stories/draft/@DraftId" class="btn-secondary">Cancel</a>
+            <a href="/stories/draft/@DraftId" class="btn btn-secondary">Cancel</a>
         </div>
 
         @if (ErrorMessage is not null)

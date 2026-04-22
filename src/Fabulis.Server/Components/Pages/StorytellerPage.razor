@@ -7,7 +7,10 @@
 @using Microsoft.EntityFrameworkCore
 @rendermode InteractiveServer
 
-<p class="breadcrumb"><a href="/storytellers">Storytellers</a> / @(IsNew ? "New" : Name)</p>
+<PageHeader>
+    <Breadcrumb><a href="/storytellers">Storytellers</a></Breadcrumb>
+    <TitleContent>@(IsNew ? "New storyteller" : (Name ?? "Storyteller"))</TitleContent>
+</PageHeader>
 
 @if (!IsNew && Storyteller is null)
 {
@@ -19,58 +22,67 @@ else
     {
         <div class="confirm-bar">
             <span>Delete this storyteller?</span>
-            <EditForm Model="this" OnValidSubmit="Delete" FormName="deleteStoryteller">
-                <button type="submit" class="btn-danger">Yes, delete</button>
+            <EditForm Model="this" OnValidSubmit="Delete" FormName="deleteStoryteller" style="margin: 0;">
+                <button type="submit" class="btn btn-danger">Yes, delete</button>
             </EditForm>
-            <a href="/storytellers/@Id" class="btn-secondary">Cancel</a>
+            <a href="/storytellers/@Id" class="btn btn-secondary">Cancel</a>
         </div>
     }
 
-    <div class="detail-form">
-        <EditForm Model="this" OnValidSubmit="Save" FormName="saveStoryteller">
-            <div class="form-group">
-                <label for="name">Name</label>
-                <InputText id="name" @bind-Value="Name" placeholder="e.g. Adventure Narrator" />
-            </div>
+    <EditForm Model="this" OnValidSubmit="Save" FormName="saveStoryteller">
+        <div class="detail-panels">
 
-            <div class="form-group">
-                <label for="prompt">Prompt</label>
-                <InputTextArea id="prompt" @bind-Value="Prompt" rows="8" placeholder="You are a creative storyteller who..." />
-            </div>
-
-            <div class="prompt-assistant">
-                <div class="prompt-assistant-input">
-                    <input type="text" @bind="PromptDescription" @bind:event="oninput" placeholder="Describe your storyteller, e.g. 'a pirate who tells bedtime stories'" />
-                    <button type="button" @onclick="GeneratePrompt" disabled="@IsGenerating">
-                        @(IsGenerating ? "Generating..." : "Generate Prompt")
-                    </button>
+            <section class="detail-panel card">
+                <h2>Identity</h2>
+                <div class="field">
+                    <label for="name">Name</label>
+                    <InputText id="name" @bind-Value="Name" placeholder="e.g. Adventure Narrator" />
                 </div>
-                @if (GenerateError is not null)
-                {
-                    <p class="error-message">@GenerateError</p>
-                }
-            </div>
+            </section>
 
-            <div class="form-group">
-                <label>Model</label>
+            <section class="detail-panel card">
+                <h2>Prompt</h2>
+                <div class="field">
+                    <label for="prompt">System prompt</label>
+                    <InputTextArea id="prompt" @bind-Value="Prompt" rows="8" placeholder="You are a creative storyteller who..." />
+                </div>
+                <div class="card card-muted" style="border-left: 3px solid var(--gilt); margin-top: var(--space-3);">
+                    <p class="label" style="margin-bottom: var(--space-2);">Prompt assistant</p>
+                    <div class="field-row">
+                        <div class="field" style="flex: 1;">
+                            <input type="text" @bind="PromptDescription" @bind:event="oninput" placeholder="Describe your storyteller, e.g. 'a pirate who tells bedtime stories'" />
+                        </div>
+                        <button type="button" class="btn btn-accent" @onclick="GeneratePrompt" disabled="@IsGenerating">
+                            @(IsGenerating ? "Generating…" : "Generate prompt")
+                        </button>
+                    </div>
+                    @if (GenerateError is not null)
+                    {
+                        <p class="error-message">@GenerateError</p>
+                    }
+                </div>
+            </section>
+
+            <section class="detail-panel card">
+                <h2>Model</h2>
                 @if (ModelName is not null)
                 {
-                    <p class="settings-current">Selected: <strong>@ModelName</strong></p>
+                    <p class="meta" style="margin-bottom: var(--space-2);">Selected: <strong>@ModelName</strong></p>
                 }
                 <div class="model-picker">
                     <div class="model-picker-search">
-                        <input type="text" @bind="ModelSearch" @bind:event="oninput" placeholder="Search models..." />
+                        <input type="text" @bind="ModelSearch" @bind:event="oninput" placeholder="Search models…" />
                         @if (Models.Count == 0 && !IsLoadingModels)
                         {
-                            <button type="button" @onclick="LoadModels" disabled="@IsLoadingModels">
-                                Load Models
+                            <button type="button" class="btn btn-secondary btn-sm" @onclick="LoadModels" disabled="@IsLoadingModels">
+                                Load models
                             </button>
                         }
                     </div>
 
                     @if (IsLoadingModels)
                     {
-                        <p class="form-hint">Loading models from OpenRouter...</p>
+                        <p class="field-hint">Loading models from OpenRouter…</p>
                     }
                     else if (ModelsError is not null)
                     {
@@ -89,59 +101,57 @@ else
                             }
                             @if (FilteredModels.Count == 0)
                             {
-                                <p class="empty-message" style="padding: 0.5rem;">No models match your search.</p>
+                                <p class="meta" style="padding: var(--space-2);">No models match your search.</p>
                             }
                         </div>
                     }
                 </div>
-            </div>
+            </section>
 
-            <div class="form-group">
-                <label for="temperature">Temperature</label>
-                <InputNumber id="temperature" @bind-Value="Temperature" step="0.1" min="0" max="2" />
-                <p class="form-hint">0.0 = deterministic, 2.0 = very creative</p>
-            </div>
+            <section class="detail-panel card">
+                <h2>Sampling</h2>
+                <div class="field">
+                    <label for="temperature">Temperature</label>
+                    <InputNumber id="temperature" @bind-Value="Temperature" step="0.1" min="0" max="2" />
+                    <p class="field-hint">0.0 = deterministic, 2.0 = very creative</p>
+                </div>
+                <div class="field">
+                    <label for="topp">Top P</label>
+                    <InputNumber id="topp" @bind-Value="TopP" step="0.1" min="0" max="1" />
+                    <p class="field-hint">Optional. Leave empty for provider default.</p>
+                </div>
+                <div class="field">
+                    <label for="maxtokens">Max Tokens</label>
+                    <InputNumber id="maxtokens" @bind-Value="MaxTokens" min="1" />
+                    <p class="field-hint">Optional. Leave empty for provider default.</p>
+                </div>
+                <div class="field">
+                    <label for="minp">Min P</label>
+                    <InputNumber id="minp" @bind-Value="MinP" step="0.01" min="0" max="1" />
+                    <p class="field-hint">Optional. Leave empty for provider default.</p>
+                </div>
+                <div class="field">
+                    <label for="topk">Top K</label>
+                    <InputNumber id="topk" @bind-Value="TopK" min="0" />
+                    <p class="field-hint">Optional. Leave empty for provider default.</p>
+                </div>
+                <div class="field">
+                    <label for="topa">Top A</label>
+                    <InputNumber id="topa" @bind-Value="TopA" step="0.01" min="0" max="1" />
+                    <p class="field-hint">Optional. Leave empty for provider default.</p>
+                </div>
+            </section>
 
-            <div class="form-group">
-                <label for="topp">Top P</label>
-                <InputNumber id="topp" @bind-Value="TopP" step="0.1" min="0" max="1" />
-                <p class="form-hint">Optional. Leave empty for provider default.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="maxtokens">Max Tokens</label>
-                <InputNumber id="maxtokens" @bind-Value="MaxTokens" min="1" />
-                <p class="form-hint">Optional. Leave empty for provider default.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="minp">Min P</label>
-                <InputNumber id="minp" @bind-Value="MinP" step="0.01" min="0" max="1" />
-                <p class="form-hint">Optional. Leave empty for provider default.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="topk">Top K</label>
-                <InputNumber id="topk" @bind-Value="TopK" min="0" />
-                <p class="form-hint">Optional. Leave empty for provider default.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="topa">Top A</label>
-                <InputNumber id="topa" @bind-Value="TopA" step="0.01" min="0" max="1" />
-                <p class="form-hint">Optional. Leave empty for provider default.</p>
-            </div>
-
-            <div class="form-actions">
-                <button type="submit">@(IsNew ? "Create" : "Save")</button>
+            <div style="display: flex; gap: var(--space-2);">
+                <button type="submit" class="btn btn-primary">@(IsNew ? "Create" : "Save")</button>
                 @if (!IsNew)
                 {
-                    <a href="/storytellers/@Id?action=delete" class="btn-danger">Delete</a>
+                    <a href="/storytellers/@Id?action=delete" class="btn btn-danger">Delete</a>
                 }
-                <a href="/storytellers" class="btn-secondary">Cancel</a>
+                <a href="/storytellers" class="btn btn-secondary">Cancel</a>
             </div>
-        </EditForm>
-    </div>
+        </div>
+    </EditForm>
 }
 
 @if (ErrorMessage is not null)

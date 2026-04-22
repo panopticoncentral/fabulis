@@ -4,30 +4,46 @@
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 
-<h1>Story Library</h1>
+<PageHeader Title="Library">
+    <Subtitle>@($"{Categories.Count} categor{(Categories.Count == 1 ? "y" : "ies")}")</Subtitle>
+</PageHeader>
 
-<div class="add-form">
-    <EditForm Model="this" OnValidSubmit="AddCategory" FormName="addCategory">
-        <InputText @bind-Value="NewCategoryName" placeholder="New category name..." />
-        <button type="submit">Add Category</button>
+<div class="card" style="margin-bottom: var(--space-5);">
+    <EditForm Model="this" OnValidSubmit="AddCategory" FormName="addCategory" class="inline-add">
+        <InputText @bind-Value="NewCategoryName" placeholder="New category name…" />
+        <button type="submit" class="btn btn-primary">Add category</button>
     </EditForm>
 </div>
 
 @if (Categories.Count == 0)
 {
-    <p class="empty-message">No categories yet. Add one above to get started.</p>
+    <EmptyState Title="Your library is empty" Body="Create a category above to start organizing stories." />
 }
 else
 {
-    <ul class="item-list">
+    <div class="card-grid">
         @foreach (var category in Categories)
         {
-            <li>
-                <a href="/categories/@category.Id">@category.Name</a>
-                <span class="meta">@category.Stories.Count story(ies)</span>
-            </li>
+            <a href="/categories/@category.Id" class="story-card">
+                <div class="story-eyebrow">Category</div>
+                <h3 class="story-title">@category.Name</h3>
+                <p class="story-excerpt">
+                    @if (category.Stories.Count == 0)
+                    {
+                        <em>no stories yet</em>
+                    }
+                    else
+                    {
+                        @(category.Stories.OrderByDescending(s => s.CreatedAt).First().Title)
+                    }
+                </p>
+                <div class="story-meta">
+                    <span>@category.Stories.Count @(category.Stories.Count == 1 ? "story" : "stories")</span>
+                    <span>@FormatDate(category.CreatedAt)</span>
+                </div>
+            </a>
         }
-    </ul>
+    </div>
 }
 
 @code {
@@ -69,4 +85,6 @@ else
         NewCategoryName = null;
         await LoadCategories();
     }
+
+    private static string FormatDate(DateTime dt) => dt.ToLocalTime().ToString("yyyy-MM-dd");
 }

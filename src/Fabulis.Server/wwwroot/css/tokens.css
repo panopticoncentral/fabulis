@@ -1,0 +1,66 @@
+/* Design tokens — single source of truth for palette, type, and layout. */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/Fraunces-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Palette */
+  --paper:      #faf6ec;
+  --parchment:  #f5efe4;
+  --linen:      #f0e7d3;
+  --ink:        #2b2417;
+  --ink-muted:  #6b5f44;
+  --meta:       #8a7a5c;
+  --rule:       #e0d6c2;
+  --gilt:       #c9a85a;
+  --gilt-deep:  #8a6c24;
+  --seal:       #9b3535;
+
+  --field-bg:   #fdfaf2;
+  --field-border: #d7cab0;
+  --gilt-ring:  rgba(201, 168, 90, 0.18);
+  --gilt-tint:  rgba(201, 168, 90, 0.14);
+  --ink-hover:  rgba(43, 36, 23, 0.04);
+
+  /* Typography */
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:  ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Spacing (8px grid) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(43, 36, 23, 0.04);
+  --shadow-md: 0 4px 12px rgba(43, 36, 23, 0.06);
+  --shadow-lg: 0 10px 30px rgba(43, 36, 23, 0.08);
+
+  /* Sidebar */
+  --sidebar-width: 240px;
+  --sidebar-width-compact: 64px;
+}

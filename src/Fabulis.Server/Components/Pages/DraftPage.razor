@@ -9,115 +9,111 @@
 
 @if (CurrentDraft is null)
 {
-    <p>Draft not found.</p>
+    <PageHeader Title="Draft not found" />
 }
 else
 {
-    <p class="breadcrumb">
-        <a href="/stories/new">New Story</a>
-        &rsaquo;
-        @(CurrentDraft.Title ?? "Untitled")
-    </p>
-
-    <div class="draft-header">
-        <div>
-            <h1 class="draft-title" @onclick="() => IsEditingTitle = true">
-                @if (IsEditingTitle)
-                {
-                    <input type="text" @bind="EditTitle" @bind:event="oninput"
-                           @onblur="SaveTitle" @onkeydown="OnTitleKeyDown"
-                           style="font-size: inherit; font-weight: inherit; border: 1px solid #ccc; border-radius: 4px; padding: 0.1rem 0.3rem; width: 100%;" />
-                }
-                else
-                {
-                    @(CurrentDraft.Title ?? "Untitled")
-                }
-            </h1>
-            <p class="meta">@CurrentDraft.Storyteller.Name · @CurrentDraft.Storyteller.ModelName</p>
-        </div>
-        <div class="page-actions">
-            <a href="/stories/draft/@DraftId/save" class="btn-secondary">Save to Library</a>
-            @if (!ConfirmingDelete)
+    <PageHeader>
+        <Breadcrumb><a href="/stories/new">New Story</a> &rsaquo; Draft</Breadcrumb>
+        <Eyebrow>Draft &middot; @CurrentDraft.Messages.Count @(CurrentDraft.Messages.Count == 1 ? "turn" : "turns")</Eyebrow>
+        <TitleContent>
+            @if (IsEditingTitle)
             {
-                <button class="btn-danger" @onclick="() => ConfirmingDelete = true">Delete</button>
+                <input type="text" class="field-input" @bind="EditTitle" @bind:event="oninput"
+                       @onblur="SaveTitle" @onkeydown="OnTitleKeyDown"
+                       style="font-family: inherit; font-size: inherit; background: transparent; border: 1px dashed var(--gilt); border-radius: var(--radius-sm); padding: 0.1rem 0.4rem; width: 100%;" />
             }
             else
             {
-                <span>Delete this draft?</span>
-                <button class="btn-danger" @onclick="DeleteDraft">Yes</button>
-                <button class="btn-secondary" @onclick="() => ConfirmingDelete = false">No</button>
+                <span @onclick="StartEditTitle" style="cursor: pointer;">@(CurrentDraft.Title ?? "Untitled")</span>
             }
-        </div>
-    </div>
+        </TitleContent>
+        <Actions>
+            <a href="/stories/draft/@DraftId/save" class="btn btn-secondary">Save to Library</a>
+            @if (!ConfirmingDelete)
+            {
+                <button class="btn btn-danger" @onclick="() => ConfirmingDelete = true">Delete</button>
+            }
+            else
+            {
+                <button class="btn btn-danger" @onclick="DeleteDraft">Confirm delete</button>
+                <button class="btn btn-secondary" @onclick="() => ConfirmingDelete = false">Cancel</button>
+            }
+        </Actions>
+    </PageHeader>
 
-    <div class="conversation">
-        @foreach (var message in CurrentDraft.Messages)
-        {
-            var isLast = message == CurrentDraft.Messages.Last();
-            <div class="message @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
-                <div class="message-role">@message.Role</div>
-                @if (EditingMessageId == message.Id)
-                {
-                    <div class="message-editing">
-                        <textarea @bind="EditingContent" @bind:event="oninput" rows="4"></textarea>
-                        <div class="message-edit-actions">
-                            @if (message.Role == MessageRole.Prompt)
-                            {
-                                <button class="btn-secondary" @onclick="() => SaveEditAndResubmit(message)">Save & Resubmit</button>
-                            }
-                            else
-                            {
-                                <button class="btn-secondary" @onclick="() => SaveEdit(message)">Save</button>
-                            }
-                            <button class="btn-secondary" @onclick="CancelEdit">Cancel</button>
+    <div class="draft-studio">
+        <div class="draft-conversation">
+            @foreach (var message in CurrentDraft.Messages)
+            {
+                var isLast = message == CurrentDraft.Messages.Last();
+                <div class="msg @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
+                    <div class="msg-role">@message.Role</div>
+                    @if (EditingMessageId == message.Id)
+                    {
+                        <div class="msg-editing">
+                            <textarea @bind="EditingContent" @bind:event="oninput" rows="4"></textarea>
+                            <div class="msg-actions">
+                                @if (message.Role == MessageRole.Prompt)
+                                {
+                                    <button class="btn btn-accent btn-sm" @onclick="() => SaveEditAndResubmit(message)">Save &amp; Resubmit</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-primary btn-sm" @onclick="() => SaveEdit(message)">Save</button>
+                                }
+                                <button class="btn btn-ghost btn-sm" @onclick="CancelEdit">Cancel</button>
+                            </div>
                         </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <div class="msg-content">@(RenderMarkdown(message.Content))</div>
+                        @if (!IsStreaming)
+                        {
+                            <div class="msg-actions">
+                                <button class="btn btn-ghost btn-sm" @onclick="() => StartEditMessage(message)">Edit</button>
+                                @if (isLast && message.Role == MessageRole.Response)
+                                {
+                                    <button class="btn btn-ghost btn-sm" @onclick="RegenerateLastResponse">Regenerate</button>
+                                }
+                                <button class="btn btn-ghost btn-sm" @onclick="() => DeleteMessage(message)">Delete</button>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+
+            @if (StreamingContent.Length > 0)
+            {
+                <div class="msg response">
+                    <div class="msg-role">Response</div>
+                    <div class="msg-content">@(RenderMarkdown(StreamingContent.ToString()))</div>
+                </div>
+            }
+
+            <div class="draft-input">
+                <textarea @bind="UserInput" @bind:event="oninput" placeholder="Continue the story, or ask for a new direction…"
+                          rows="3" disabled="@IsStreaming"
+                          @onkeydown="OnInputKeyDown"></textarea>
+                @if (IsStreaming)
+                {
+                    <button class="btn btn-danger" @onclick="CancelGeneration">Stop</button>
                 }
                 else
                 {
-                    <div class="message-content">@(RenderMarkdown(message.Content))</div>
-                    @if (!IsStreaming)
-                    {
-                        <div class="message-actions">
-                            <button @onclick="() => StartEditMessage(message)">Edit</button>
-                            @if (isLast && message.Role == MessageRole.Response)
-                            {
-                                <button @onclick="RegenerateLastResponse">Regenerate</button>
-                            }
-                            <button @onclick="() => DeleteMessage(message)">Delete</button>
-                        </div>
-                    }
+                    <button class="btn btn-accent" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(UserInput))">&#x2726; Generate</button>
                 }
             </div>
-        }
 
-        @if (StreamingContent.Length > 0)
-        {
-            <div class="message response">
-                <div class="message-role">Response</div>
-                <div class="message-content">@(RenderMarkdown(StreamingContent.ToString()))</div>
-            </div>
-        }
+            @if (ErrorMessage is not null)
+            {
+                <p class="error-message">@ErrorMessage</p>
+            }
+        </div>
+
+        <StorytellerPanel Storyteller="CurrentDraft.Storyteller" />
     </div>
-
-    <div class="chat-input">
-        <textarea @bind="UserInput" @bind:event="oninput" placeholder="Type your message..."
-                  rows="3" disabled="@IsStreaming"
-                  @onkeydown="OnInputKeyDown"></textarea>
-        @if (IsStreaming)
-        {
-            <button @onclick="CancelGeneration">Stop</button>
-        }
-        else
-        {
-            <button @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(UserInput))">Send</button>
-        }
-    </div>
-
-    @if (ErrorMessage is not null)
-    {
-        <p class="error-message">@ErrorMessage</p>
-    }
 }
 
 @code {
@@ -151,6 +147,12 @@ else
             return;
         }
         CurrentDraft = await Drafts.GetDraftAsync(DraftId);
+    }
+
+    private void StartEditTitle()
+    {
+        EditTitle = CurrentDraft?.Title;
+        IsEditingTitle = true;
     }
 
     private async Task SendMessage()

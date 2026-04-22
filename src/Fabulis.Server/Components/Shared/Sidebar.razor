@@ -1,0 +1,130 @@
+@inject VaultService Vault
+@inject NavigationManager Nav
+@inject IServiceProvider Services
+@using Microsoft.EntityFrameworkCore
+@implements IDisposable
+
+<aside class="app-sidebar">
+    <a href="/" class="sidebar-brand">
+        <span class="flourish">&#x2766;</span><span>Fabulis</span>
+    </a>
+
+    @if (Vault.IsUnlocked)
+    {
+        <div class="sidebar-section">
+            <a href="/stories/new" class="sidebar-link @ActiveClass("/stories/new")">
+                <span class="icon">&#xFF0B;</span><span>New Story</span>
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Library</div>
+            <a href="/library" class="sidebar-link @ActiveClass("/library")">
+                <span class="icon">&#x2767;</span><span>All Categories</span>
+            </a>
+            @foreach (var cat in Categories)
+            {
+                var catPath = "/categories/" + cat.Id;
+                <a href="@catPath" class="sidebar-link @ActiveClass(catPath)">
+                    <span class="icon">&#x2666;</span>
+                    <span>@cat.Name</span>
+                    <span class="count">@cat.StoryCount</span>
+                </a>
+            }
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Workshop</div>
+            <a href="/storytellers" class="sidebar-link @ActiveClass("/storytellers")">
+                <span class="icon">&#x2619;</span><span>Storytellers</span>
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-label">Tools</div>
+            <a href="/import" class="sidebar-link @ActiveClass("/import")">
+                <span class="icon">&#x2193;</span><span>Import</span>
+            </a>
+            <a href="/export" class="sidebar-link @ActiveClass("/export")">
+                <span class="icon">&#x2191;</span><span>Export</span>
+            </a>
+            <a href="/settings" class="sidebar-link @ActiveClass("/settings")">
+                <span class="icon">&#x2699;</span><span>Settings</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+            <span class="lock-badge unlocked">&#x1F513; Vault unlocked</span>
+        </div>
+    }
+    else
+    {
+        <div class="sidebar-section">
+            <a href="/unlock" class="sidebar-link @ActiveClass("/unlock")">
+                <span class="icon">&#x1F512;</span><span>Unlock</span>
+            </a>
+        </div>
+        <div class="sidebar-footer">
+            <span class="lock-badge locked">&#x1F512; Vault locked</span>
+        </div>
+    }
+</aside>
+
+@code {
+    private record CategoryRow(int Id, string Name, int StoryCount);
+
+    private List<CategoryRow> Categories { get; set; } = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        await LoadCategoriesAsync();
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        if (!Vault.IsUnlocked)
+        {
+            Categories = [];
+            return;
+        }
+
+        try
+        {
+            await using var scope = Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
+            Categories = await db.Categories
+                .OrderBy(c => c.Name)
+                .Select(c => new CategoryRow(c.Id, c.Name, c.Stories.Count))
+                .ToListAsync();
+        }
+        catch
+        {
+            Categories = [];
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadCategoriesAsync();
+            StateHasChanged();
+        });
+    }
+
+    private string ActiveClass(string path)
+    {
+        var uri = new Uri(Nav.Uri);
+        var current = uri.AbsolutePath.TrimEnd('/');
+        var target = path.TrimEnd('/');
+        if (target.Length == 0) target = "/";
+        if (current.Length == 0) current = "/";
+        return current == target ? "active" : string.Empty;
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

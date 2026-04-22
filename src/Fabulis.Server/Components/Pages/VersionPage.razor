@@ -1,4 +1,5 @@
 @page "/versions/{VersionId:int}"
+@layout Fabulis.Server.Components.Layout.CenteredLayout
 @inject FabulisDbContext Db
 @inject VaultService Vault
 @inject NavigationManager Nav
@@ -11,22 +12,42 @@
 }
 else
 {
-    <p class="breadcrumb">
-        <a href="/categories/@Version.Story.CategoryId">@Version.Story.Category.Name</a>
-        &rsaquo;
-        <a href="/stories/@Version.Story.Id">@Version.Story.Title</a>
-    </p>
-    <h1>@Version.Story.Title</h1>
-    <p class="meta">@Version.ModelName &mdash; @Version.CreatedAt.ToString("yyyy-MM-dd HH:mm")</p>
+    <div class="reading-page">
+        <header class="reading-header">
+            <p class="breadcrumb">
+                <a href="/categories/@Version.Story.CategoryId">@Version.Story.Category.Name</a>
+                &rsaquo;
+                <a href="/stories/@Version.Story.Id">@Version.Story.Title</a>
+            </p>
+            <p class="eyebrow">Version @Version.VersionNumber &middot; @Version.ModelName</p>
+            <h1 class="reading-title">@Version.Story.Title</h1>
+            <p class="reading-subtitle">@Version.CreatedAt.ToLocalTime().ToString("MMMM d, yyyy")</p>
+        </header>
 
-    <div class="conversation">
-        @foreach (var message in Version.Messages.OrderBy(m => m.SortOrder))
-        {
-            <div class="message @(message.Role == MessageRole.Prompt ? "prompt" : "response")">
-                <div class="message-role">@message.Role</div>
-                <div class="message-content">@(RenderMarkdown(message.Content))</div>
-            </div>
-        }
+        <Flourish />
+
+        <div class="reading-prose">
+            @foreach (var message in Version.Messages.OrderBy(m => m.SortOrder))
+            {
+                @if (message.Role == MessageRole.Response)
+                {
+                    <div class="msg-content">@(RenderMarkdown(message.Content))</div>
+                }
+                else
+                {
+                    <div class="card card-muted" style="margin: var(--space-4) 0; font-family: var(--font-sans); font-size: 0.9rem;">
+                        <p class="label" style="margin-bottom: var(--space-2);">Prompt</p>
+                        <div>@(RenderMarkdown(message.Content))</div>
+                    </div>
+                }
+            }
+        </div>
+
+        <Flourish />
+
+        <p style="text-align: center;">
+            <a href="/stories/@Version.Story.Id" class="btn btn-secondary">&larr; Back to story</a>
+        </p>
     </div>
 }
 

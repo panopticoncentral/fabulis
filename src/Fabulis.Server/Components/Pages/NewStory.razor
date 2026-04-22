@@ -6,45 +6,55 @@
 @inject NavigationManager Nav
 @using Microsoft.EntityFrameworkCore
 
-<h1>New Story</h1>
+<PageHeader Title="New Story">
+    <Subtitle>Pick a storyteller and begin a draft.</Subtitle>
+</PageHeader>
 
-<div class="detail-form" style="margin-bottom: 2rem;">
-    <h2>Start a Conversation</h2>
+<div class="card" style="max-width: 640px;">
     @if (StorytellerList.Count == 0)
     {
-        <p class="empty-message">No storytellers yet. <a href="/storytellers/new">Create one</a> first.</p>
+        <EmptyState Title="No storytellers yet">
+            <ChildContent>
+                <a href="/storytellers/new" class="btn btn-accent">Create your first storyteller</a>
+            </ChildContent>
+        </EmptyState>
     }
     else
     {
-        <div class="form-group">
-            <label>Storyteller</label>
-            <select @bind="SelectedStorytellerId" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;">
-                <option value="0">Select a storyteller...</option>
+        <div class="field">
+            <label for="storyteller">Storyteller</label>
+            <select id="storyteller" @bind="SelectedStorytellerId">
+                <option value="0">Select a storyteller…</option>
                 @foreach (var s in StorytellerList)
                 {
                     <option value="@s.Id">@s.Name (@s.ModelName)</option>
                 }
             </select>
         </div>
-        <button @onclick="StartNewDraft"
-                style="padding: 0.5rem 1rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem;">
-            Start
+        <button class="btn btn-accent" @onclick="StartNewDraft" disabled="@(SelectedStorytellerId == 0)">
+            &#x2726; Start draft
         </button>
     }
 </div>
 
 @if (DraftList.Count > 0)
 {
-    <h2>In Progress</h2>
-    <ul class="item-list">
-        @foreach (var draft in DraftList)
-        {
-            <li>
-                <a href="/stories/draft/@draft.Id">@(draft.Title ?? "Untitled")</a>
-                <span class="meta">@draft.Storyteller.Name · @draft.Messages.Count messages · @draft.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</span>
-            </li>
-        }
-    </ul>
+    <section style="margin-top: var(--space-6);">
+        <h2 style="font-size: 1.1rem; margin-bottom: var(--space-3);">In progress</h2>
+        <div class="card-grid">
+            @foreach (var draft in DraftList)
+            {
+                <a href="/stories/draft/@draft.Id" class="story-card">
+                    <div class="story-eyebrow">Draft &middot; @draft.Messages.Count @(draft.Messages.Count == 1 ? "turn" : "turns")</div>
+                    <h3 class="story-title">@(draft.Title ?? "Untitled")</h3>
+                    <div class="story-meta">
+                        <span>@draft.Storyteller.Name</span>
+                        <span>@draft.UpdatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                    </div>
+                </a>
+            }
+        </div>
+    </section>
 }
 
 @code {

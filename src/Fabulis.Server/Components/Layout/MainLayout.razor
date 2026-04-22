@@ -1,17 +1,9 @@
 @inherits LayoutComponentBase
+@using Fabulis.Server.Components.Shared
 
-<header>
-    <nav>
-        <a href="/">Fabulis</a>
-        <a href="/library">Library</a>
-        <a href="/stories/new">New Story</a>
-        <a href="/import">Import</a>
-        <a href="/export">Export</a>
-        <a href="/storytellers">Storytellers</a>
-        <a href="/settings">Settings</a>
-    </nav>
-</header>
-
-<main>
-    @Body
-</main>
+<div class="app-shell">
+    <Sidebar />
+    <main class="app-main">
+        @Body
+    </main>
+</div>

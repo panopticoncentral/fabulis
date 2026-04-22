@@ -6,28 +6,39 @@
 
 @if (Story is null)
 {
-    <p>Story not found.</p>
+    <PageHeader Title="Story not found" />
 }
 else
 {
-    <p class="breadcrumb"><a href="/categories/@Story.CategoryId">@Story.Category.Name</a></p>
-    <h1>@Story.Title</h1>
+    <PageHeader Title="@Story.Title">
+        <Breadcrumb><a href="/library">Library</a> &rsaquo; <a href="/categories/@Story.CategoryId">@Story.Category.Name</a></Breadcrumb>
+        <Subtitle>
+            <a href="/categories/@Story.CategoryId" class="chip">@Story.Category.Name</a>
+            <span style="margin-left: var(--space-2);">@(Story.Versions.Count == 1 ? "1 version" : $"{Story.Versions.Count} versions")</span>
+        </Subtitle>
+        <Actions>
+            <a href="/stories/new" class="btn btn-accent">&#x2726; New draft</a>
+        </Actions>
+    </PageHeader>
 
     @if (Story.Versions.Count == 0)
     {
-        <p class="empty-message">No versions yet.</p>
+        <EmptyState Title="No versions yet" Body="Start a draft and save it here to create the first version." />
     }
     else
     {
-        <ul class="item-list">
-            @foreach (var version in Story.Versions.OrderBy(v => v.VersionNumber))
+        <div class="version-timeline">
+            @foreach (var version in Story.Versions.OrderByDescending(v => v.VersionNumber))
             {
-                <li>
-                    <a href="/versions/@version.Id">Version @version.VersionNumber</a>
-                    <span class="meta">@version.ModelName</span>
-                </li>
+                <div class="version-item">
+                    <div>
+                        <div class="eyebrow" style="color: var(--gilt-deep);">Version @version.VersionNumber</div>
+                        <div class="meta">@version.ModelName &middot; @version.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+                    </div>
+                    <a href="/versions/@version.Id" class="btn btn-secondary btn-sm">Read</a>
+                </div>
             }
-        </ul>
+        </div>
     }
 }
 
