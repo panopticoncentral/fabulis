@@ -78,6 +78,6 @@
     {
         if (SelectedStorytellerId == 0) return;
         var draft = await Drafts.CreateDraftAsync(SelectedStorytellerId);
-        Nav.NavigateTo($"/stories/draft/{draft.Id}");
+        Nav.NavigateSafe($"/stories/draft/{draft.Id}");
     }
 }

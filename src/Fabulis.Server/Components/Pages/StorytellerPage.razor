@@ -335,7 +335,7 @@ else
         }
 
         await Db.SaveChangesAsync();
-        Nav.NavigateTo("/storytellers");
+        Nav.NavigateSafe("/storytellers");
     }
 
     private async Task Delete()
@@ -344,6 +344,6 @@ else
 
         Db.Storytellers.Remove(Storyteller);
         await Db.SaveChangesAsync();
-        Nav.NavigateTo("/storytellers");
+        Nav.NavigateSafe("/storytellers");
     }
 }

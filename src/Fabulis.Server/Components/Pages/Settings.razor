@@ -215,7 +215,7 @@
         var categories = await Db.Categories.ToListAsync();
         Db.Categories.RemoveRange(categories);
         await Db.SaveChangesAsync();
-        Nav.NavigateTo("/settings");
+        Nav.NavigateSafe("/settings");
     }
 
     private async Task SaveApiKey()
@@ -242,6 +242,6 @@
     private void LockVault()
     {
         Vault.Lock();
-        Nav.NavigateTo("/unlock");
+        Nav.NavigateSafe("/unlock");
     }
 }

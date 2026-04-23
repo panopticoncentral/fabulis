@@ -203,7 +203,7 @@ else
     {
         if (CurrentDraft is null) return;
         await Drafts.DeleteDraftAsync(CurrentDraft.Id);
-        Nav.NavigateTo("/stories/new");
+        Nav.NavigateSafe("/stories/new");
     }
 
     private void StartEditMessage(DraftMessage msg)

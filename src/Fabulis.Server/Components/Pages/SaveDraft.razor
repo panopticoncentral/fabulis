@@ -168,7 +168,7 @@ else
             }
 
             var version = await Drafts.SaveToLibraryAsync(CurrentDraft.Id, categoryId, storyId, storyTitle);
-            Nav.NavigateTo($"/versions/{version.Id}");
+            Nav.NavigateSafe($"/versions/{version.Id}");
         }
         catch (Exception ex)
         {
