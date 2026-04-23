@@ -24,7 +24,11 @@ builder.Services.AddScoped<OpenRouterService>();
 builder.Services.AddScoped<DraftService>();
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddHubOptions(options =>
+    {
+        options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+    });
 
 var app = builder.Build();
 
