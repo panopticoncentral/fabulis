@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<VaultService>();
+builder.Services.AddHostedService<AutoLockService>();
 builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
 {
     var vault = sp.GetRequiredService<VaultService>();
@@ -38,6 +39,24 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value;
+    var isInfra = path is not null && (
+        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase));
+
+    if (!isInfra)
+    {
+        var vault = context.RequestServices.GetRequiredService<VaultService>();
+        vault.RecordActivity();
+    }
+
+    await next();
+});
+
 app.UseAntiforgery();
 app.MapStaticAssets();
 
