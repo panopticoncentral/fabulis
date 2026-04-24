@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Hosting;
-
 namespace Fabulis.Server.Data;
 
 public class AutoLockService(VaultService vault, ILogger<AutoLockService> logger) : BackgroundService
