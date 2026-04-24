@@ -113,6 +113,26 @@
 
     <div class="settings-item">
         <div>
+            <div class="settings-label">Auto-lock after</div>
+            <p class="settings-description">Automatically lock the vault after a period of inactivity.</p>
+        </div>
+        <select class="form-select" value="@AutoLockSelection" @onchange="OnAutoLockChanged">
+            <option value="1">1 minute</option>
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="never">Never</option>
+        </select>
+    </div>
+
+    @if (AutoLockSaved)
+    {
+        <p style="color: var(--gilt-deep); font-size: 0.85rem;">Auto-lock updated.</p>
+    }
+
+    <div class="settings-item">
+        <div>
             <div class="settings-label">Lock vault</div>
             <p class="settings-description">Lock the database and require the password to be re-entered.</p>
         </div>
@@ -142,6 +162,8 @@
     private string? ModelsError { get; set; }
     private string? ModelSearch { get; set; }
     private string? SelectedModelId { get; set; }
+    private string AutoLockSelection { get; set; } = "15";
+    private bool AutoLockSaved { get; set; }
 
     private List<ModelInfo> FilteredModels =>
         string.IsNullOrWhiteSpace(ModelSearch)
@@ -170,6 +192,20 @@
         {
             CurrentAssistantModel = existingModel.Value;
         }
+
+        var existingAutoLock = await Db.AppSettings.FindAsync("AutoLockMinutes");
+        AutoLockSelection = NormalizeAutoLock(existingAutoLock?.Value);
+    }
+
+    private static string NormalizeAutoLock(string? raw)
+    {
+        if (string.Equals(raw, "never", StringComparison.OrdinalIgnoreCase))
+            return "never";
+
+        if (int.TryParse(raw, out var parsed) && parsed is 1 or 5 or 15 or 30 or 60)
+            return parsed.ToString();
+
+        return "15";
     }
 
     private async Task LoadModels()
@@ -237,6 +273,28 @@
         ApiKey = null;
         ApiKeyPlaceholder = "••••••••  (key is set)";
         ApiKeySaved = true;
+    }
+
+    private async Task OnAutoLockChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        AutoLockSelection = NormalizeAutoLock(raw);
+
+        var existing = await Db.AppSettings.FindAsync("AutoLockMinutes");
+        if (existing is not null)
+        {
+            existing.Value = AutoLockSelection;
+        }
+        else
+        {
+            Db.AppSettings.Add(new AppSetting { Key = "AutoLockMinutes", Value = AutoLockSelection });
+        }
+
+        await Db.SaveChangesAsync();
+
+        var minutes = AutoLockSelection == "never" ? (int?)null : int.Parse(AutoLockSelection);
+        Vault.ConfigureAutoLock(minutes);
+        AutoLockSaved = true;
     }
 
     private void LockVault()
