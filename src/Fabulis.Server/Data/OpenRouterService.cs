@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Data;
 
-public class OpenRouterService(IHttpClientFactory httpClientFactory, IServiceProvider services)
+public class OpenRouterService(IHttpClientFactory httpClientFactory, IServiceProvider services, VaultService vault)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -150,9 +150,15 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             }
 
             if (!string.IsNullOrEmpty(reasoning))
+            {
+                vault.RecordActivity();
                 yield return new StreamChunk(StreamChunkKind.Reasoning, reasoning);
+            }
             if (!string.IsNullOrEmpty(content))
+            {
+                vault.RecordActivity();
                 yield return new StreamChunk(StreamChunkKind.Content, content);
+            }
         }
     }
 
