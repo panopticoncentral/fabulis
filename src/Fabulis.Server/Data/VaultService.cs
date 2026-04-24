@@ -4,9 +4,12 @@ public class VaultService
 {
     private long _lastActivityTicks;
     private int _autoLockMinutes;
+    private int _isUnlocked;
+    private string? _password;
 
-    public bool IsUnlocked { get; private set; }
-    public string? Password { get; private set; }
+    public bool IsUnlocked => Volatile.Read(ref _isUnlocked) != 0;
+
+    public string? Password => Volatile.Read(ref _password);
 
     public DateTime LastActivityAt =>
         new DateTime(Interlocked.Read(ref _lastActivityTicks), DateTimeKind.Utc);
@@ -22,15 +25,15 @@ public class VaultService
 
     public void Unlock(string password)
     {
-        Password = password;
-        IsUnlocked = true;
+        Volatile.Write(ref _password, password);
+        Volatile.Write(ref _isUnlocked, 1);
         Interlocked.Exchange(ref _lastActivityTicks, DateTime.UtcNow.Ticks);
     }
 
     public void Lock()
     {
-        Password = null;
-        IsUnlocked = false;
+        Volatile.Write(ref _password, null);
+        Volatile.Write(ref _isUnlocked, 0);
         Volatile.Write(ref _autoLockMinutes, 0);
     }
 
