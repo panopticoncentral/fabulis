@@ -55,6 +55,7 @@
             await using var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
             await db.Database.EnsureCreatedAsync();
             await db.EnsureSchemaUpdatedAsync();
+            await LoadAutoLockSettingAsync(db);
             Nav.NavigateTo("/library");
         }
         catch (NavigationException)
@@ -66,5 +67,22 @@
             Vault.Lock();
             ErrorMessage = "Could not open the vault. Is the password correct?";
         }
+    }
+
+    private async Task LoadAutoLockSettingAsync(FabulisDbContext db)
+    {
+        var setting = await db.AppSettings.FindAsync("AutoLockMinutes");
+        Vault.ConfigureAutoLock(ParseAutoLockMinutes(setting?.Value));
+    }
+
+    internal static int? ParseAutoLockMinutes(string? raw)
+    {
+        if (string.Equals(raw, "never", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (int.TryParse(raw, out var parsed) && parsed is 1 or 5 or 15 or 30 or 60)
+            return parsed;
+
+        return 15;
     }
 }
