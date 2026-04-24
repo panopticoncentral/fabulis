@@ -84,11 +84,34 @@ else
                 </div>
             }
 
-            @if (StreamingContent.Length > 0)
+            @if (IsStreaming)
             {
                 <div class="msg response">
                     <div class="msg-role">Response</div>
-                    <div class="msg-content">@(RenderMarkdown(StreamingContent.ToString()))</div>
+                    @if (StreamingReasoning.Length > 0)
+                    {
+                        <details class="thinking-panel">
+                            <summary>
+                                <span class="thinking-label">Thoughts</span>
+                                @if (StreamingContent.Length == 0)
+                                {
+                                    <span class="thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                                }
+                            </summary>
+                            <div class="thinking-content">@(RenderMarkdown(StreamingReasoning.ToString()))</div>
+                        </details>
+                    }
+                    @if (StreamingContent.Length > 0)
+                    {
+                        <div class="msg-content">@(RenderMarkdown(StreamingContent.ToString()))</div>
+                    }
+                    else if (StreamingReasoning.Length == 0)
+                    {
+                        <div class="thinking-indicator">
+                            <span class="thinking-label">Thinking</span>
+                            <span class="thinking-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                        </div>
+                    }
                 </div>
             }
 
@@ -131,6 +154,7 @@ else
     private string? UserInput { get; set; }
     private bool IsStreaming { get; set; }
     private System.Text.StringBuilder StreamingContent { get; set; } = new();
+    private System.Text.StringBuilder StreamingReasoning { get; set; } = new();
     private string? ErrorMessage { get; set; }
     private bool IsEditingTitle { get; set; }
     private string? EditTitle { get; set; }
@@ -266,6 +290,7 @@ else
         var draftId = CurrentDraft.Id;
         IsStreaming = true;
         StreamingContent.Clear();
+        StreamingReasoning.Clear();
         ErrorMessage = null;
         Cts = new CancellationTokenSource();
         StateHasChanged();
@@ -285,7 +310,10 @@ else
                 storyteller.TopA,
                 Cts.Token))
             {
-                StreamingContent.Append(chunk);
+                if (chunk.Kind == StreamChunkKind.Reasoning)
+                    StreamingReasoning.Append(chunk.Text);
+                else
+                    StreamingContent.Append(chunk.Text);
                 StateHasChanged();
             }
 
@@ -317,6 +345,7 @@ else
             Cts?.Dispose();
             Cts = null;
             StreamingContent.Clear();
+            StreamingReasoning.Clear();
             IsStreaming = false;
             StateHasChanged();
         }

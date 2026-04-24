@@ -58,7 +58,7 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             .GetString() ?? "";
     }
 
-    public async IAsyncEnumerable<string> ChatStreamAsync(string model, string systemPrompt,
+    public async IAsyncEnumerable<StreamChunk> ChatStreamAsync(string model, string systemPrompt,
         List<DraftMessage> messages, double temperature = 0.7, double? topP = null, int? maxTokens = null,
         double? minP = null, int? topK = null, double? topA = null,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -121,7 +121,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             var data = line["data: ".Length..];
             if (data == "[DONE]") break;
 
-            string? chunk = null;
+            string? content = null;
+            string? reasoning = null;
             try
             {
                 var json = JsonDocument.Parse(data);
@@ -130,15 +131,28 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
                     .GetProperty("delta");
 
                 if (delta.TryGetProperty("content", out var contentElement))
-                    chunk = contentElement.GetString();
+                    content = contentElement.GetString();
+
+                if (delta.TryGetProperty("reasoning", out var reasoningElement) &&
+                    reasoningElement.ValueKind == JsonValueKind.String)
+                {
+                    reasoning = reasoningElement.GetString();
+                }
+                else if (delta.TryGetProperty("reasoning_content", out var rcElement) &&
+                         rcElement.ValueKind == JsonValueKind.String)
+                {
+                    reasoning = rcElement.GetString();
+                }
             }
             catch (JsonException)
             {
                 // Skip malformed chunks
             }
 
-            if (chunk is not null)
-                yield return chunk;
+            if (!string.IsNullOrEmpty(reasoning))
+                yield return new StreamChunk(StreamChunkKind.Reasoning, reasoning);
+            if (!string.IsNullOrEmpty(content))
+                yield return new StreamChunk(StreamChunkKind.Content, content);
         }
     }
 
@@ -173,3 +187,7 @@ public class ModelInfo
     public required string Id { get; set; }
     public required string Name { get; set; }
 }
+
+public enum StreamChunkKind { Content, Reasoning }
+
+public readonly record struct StreamChunk(StreamChunkKind Kind, string Text);
