@@ -1,0 +1,287 @@
+@inject FabulisDbContext Db
+@inject OpenRouterService OpenRouter
+@using Microsoft.EntityFrameworkCore
+
+<section class="settings-section">
+    <h2>Storyteller</h2>
+
+    @if (Storyteller is null)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <EditForm Model="this" OnValidSubmit="Save" FormName="saveStoryteller">
+            <div class="detail-panels">
+
+                <section class="detail-panel card">
+                    <h3>Identity</h3>
+                    <div class="field">
+                        <label for="storyteller-name">Name</label>
+                        <InputText id="storyteller-name" @bind-Value="Name" placeholder="e.g. Adventure Narrator" />
+                    </div>
+                </section>
+
+                <section class="detail-panel card">
+                    <h3>Prompt</h3>
+                    <div class="field">
+                        <label for="storyteller-prompt">System prompt</label>
+                        <InputTextArea id="storyteller-prompt" @bind-Value="Prompt" rows="8" placeholder="You are a creative storyteller who..." />
+                    </div>
+                    <div class="card card-muted" style="border-left: 3px solid var(--gilt); margin-top: var(--space-3);">
+                        <p class="label" style="margin-bottom: var(--space-2);">Prompt assistant</p>
+                        <div class="field-row">
+                            <div class="field" style="flex: 1;">
+                                <input type="text" @bind="PromptDescription" @bind:event="oninput" placeholder="Describe your storyteller, e.g. 'a pirate who tells bedtime stories'" />
+                            </div>
+                            <button type="button" class="btn btn-accent" @onclick="GeneratePrompt" disabled="@IsGenerating">
+                                @(IsGenerating ? "Generating…" : "Generate prompt")
+                            </button>
+                        </div>
+                        @if (GenerateError is not null)
+                        {
+                            <p class="error-message">@GenerateError</p>
+                        }
+                    </div>
+                </section>
+
+                <section class="detail-panel card">
+                    <h3>Model</h3>
+                    @if (ModelName is not null)
+                    {
+                        <p class="meta" style="margin-bottom: var(--space-2);">Selected: <strong>@ModelName</strong></p>
+                    }
+                    <div class="model-picker">
+                        <div class="model-picker-search">
+                            <input type="text" @bind="ModelSearch" @bind:event="oninput" placeholder="Search models…" />
+                            @if (Models.Count == 0 && !IsLoadingModels)
+                            {
+                                <button type="button" class="btn btn-secondary btn-sm" @onclick="LoadModels" disabled="@IsLoadingModels">
+                                    Load models
+                                </button>
+                            }
+                        </div>
+
+                        @if (IsLoadingModels)
+                        {
+                            <p class="field-hint">Loading models from OpenRouter…</p>
+                        }
+                        else if (ModelsError is not null)
+                        {
+                            <p class="error-message">@ModelsError</p>
+                        }
+                        else if (Models.Count > 0)
+                        {
+                            <div class="model-picker-list">
+                                @foreach (var model in FilteredModels)
+                                {
+                                    <div class="model-picker-item @(model.Id == ModelName ? "selected" : "")"
+                                         @onclick="() => ModelName = model.Id">
+                                        <span class="model-picker-id">@model.Id</span>
+                                        <span class="model-picker-name">@model.Name</span>
+                                    </div>
+                                }
+                                @if (FilteredModels.Count == 0)
+                                {
+                                    <p class="meta" style="padding: var(--space-2);">No models match your search.</p>
+                                }
+                            </div>
+                        }
+                    </div>
+                </section>
+
+                <section class="detail-panel card">
+                    <h3>Sampling</h3>
+                    <div class="field">
+                        <label for="temperature">Temperature</label>
+                        <InputNumber id="temperature" @bind-Value="Temperature" step="0.1" min="0" max="2" />
+                        <p class="field-hint">0.0 = deterministic, 2.0 = very creative</p>
+                    </div>
+                    <div class="field">
+                        <label for="topp">Top P</label>
+                        <InputNumber id="topp" @bind-Value="TopP" step="0.1" min="0" max="1" />
+                        <p class="field-hint">Optional. Leave empty for provider default.</p>
+                    </div>
+                    <div class="field">
+                        <label for="maxtokens">Max Tokens</label>
+                        <InputNumber id="maxtokens" @bind-Value="MaxTokens" min="1" />
+                        <p class="field-hint">Optional. Leave empty for provider default.</p>
+                    </div>
+                    <div class="field">
+                        <label for="minp">Min P</label>
+                        <InputNumber id="minp" @bind-Value="MinP" step="0.01" min="0" max="1" />
+                        <p class="field-hint">Optional. Leave empty for provider default.</p>
+                    </div>
+                    <div class="field">
+                        <label for="topk">Top K</label>
+                        <InputNumber id="topk" @bind-Value="TopK" min="0" />
+                        <p class="field-hint">Optional. Leave empty for provider default.</p>
+                    </div>
+                    <div class="field">
+                        <label for="topa">Top A</label>
+                        <InputNumber id="topa" @bind-Value="TopA" step="0.01" min="0" max="1" />
+                        <p class="field-hint">Optional. Leave empty for provider default.</p>
+                    </div>
+                </section>
+
+                <div style="display: flex; gap: var(--space-2); align-items: center;">
+                    <button type="submit" class="btn btn-primary">Save storyteller</button>
+                    @if (Saved)
+                    {
+                        <span style="color: var(--gilt-deep); font-size: 0.85rem;">Storyteller saved.</span>
+                    }
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    @if (ErrorMessage is not null)
+    {
+        <p class="error-message">@ErrorMessage</p>
+    }
+</section>
+
+@code {
+    private Storyteller? Storyteller { get; set; }
+    private string? ErrorMessage { get; set; }
+    private bool Saved { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? Name { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? Prompt { get; set; }
+
+    [SupplyParameterFromForm]
+    private string? ModelName { get; set; }
+
+    [SupplyParameterFromForm]
+    private double Temperature { get; set; }
+
+    [SupplyParameterFromForm]
+    private double? TopP { get; set; }
+
+    [SupplyParameterFromForm]
+    private int? MaxTokens { get; set; }
+
+    [SupplyParameterFromForm]
+    private double? MinP { get; set; }
+
+    [SupplyParameterFromForm]
+    private int? TopK { get; set; }
+
+    [SupplyParameterFromForm]
+    private double? TopA { get; set; }
+
+    private string? PromptDescription { get; set; }
+    private bool IsGenerating { get; set; }
+    private string? GenerateError { get; set; }
+
+    private List<ModelInfo> Models { get; set; } = [];
+    private bool IsLoadingModels { get; set; }
+    private string? ModelsError { get; set; }
+    private string? ModelSearch { get; set; }
+
+    private List<ModelInfo> FilteredModels =>
+        string.IsNullOrWhiteSpace(ModelSearch)
+            ? Models
+            : Models.Where(m =>
+                m.Id.Contains(ModelSearch, StringComparison.OrdinalIgnoreCase) ||
+                m.Name.Contains(ModelSearch, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Storyteller = await Db.Storytellers.SingleAsync();
+        Name ??= Storyteller.Name;
+        Prompt ??= Storyteller.Prompt;
+        ModelName ??= Storyteller.ModelName;
+        Temperature = Storyteller.Temperature;
+        TopP ??= Storyteller.TopP;
+        MaxTokens ??= Storyteller.MaxTokens;
+        MinP ??= Storyteller.MinP;
+        TopK ??= Storyteller.TopK;
+        TopA ??= Storyteller.TopA;
+    }
+
+    private async Task GeneratePrompt()
+    {
+        if (string.IsNullOrWhiteSpace(PromptDescription))
+            return;
+
+        IsGenerating = true;
+        GenerateError = null;
+
+        try
+        {
+            var model = await OpenRouter.GetSettingAsync("AssistantModel") ?? "anthropic/claude-sonnet-4";
+
+            var systemPrompt = """
+                You are an expert at crafting system prompts for AI storytelling personas.
+                Given a description of a storyteller, write a detailed, effective system prompt
+                that captures their personality, speaking style, and storytelling approach.
+                The prompt should instruct the AI to stay in character and tell engaging stories.
+                Output only the system prompt text — no explanations, preamble, or markdown formatting.
+                """;
+
+            Prompt = await OpenRouter.ChatAsync(model, systemPrompt, PromptDescription);
+        }
+        catch (Exception ex)
+        {
+            GenerateError = ex.Message;
+        }
+        finally
+        {
+            IsGenerating = false;
+        }
+    }
+
+    private async Task LoadModels()
+    {
+        IsLoadingModels = true;
+        ModelsError = null;
+
+        try
+        {
+            Models = await OpenRouter.GetModelsAsync();
+        }
+        catch (Exception ex)
+        {
+            ModelsError = ex.Message;
+        }
+        finally
+        {
+            IsLoadingModels = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        Saved = false;
+
+        if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(Prompt) || string.IsNullOrWhiteSpace(ModelName))
+        {
+            ErrorMessage = "Name, prompt, and model are required.";
+            return;
+        }
+
+        if (Storyteller is null)
+        {
+            Storyteller = await Db.Storytellers.SingleAsync();
+        }
+
+        Storyteller.Name = Name.Trim();
+        Storyteller.Prompt = Prompt.Trim();
+        Storyteller.ModelName = ModelName.Trim();
+        Storyteller.Temperature = Temperature;
+        Storyteller.TopP = TopP;
+        Storyteller.MaxTokens = MaxTokens;
+        Storyteller.MinP = MinP;
+        Storyteller.TopK = TopK;
+        Storyteller.TopA = TopA;
+
+        await Db.SaveChangesAsync();
+        ErrorMessage = null;
+        Saved = true;
+    }
+}

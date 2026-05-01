@@ -1,40 +1,17 @@
 @page "/stories/new"
 @rendermode InteractiveServer
 @inject DraftService Drafts
-@inject FabulisDbContext Db
 @inject VaultService Vault
 @inject NavigationManager Nav
-@using Microsoft.EntityFrameworkCore
 
 <PageHeader Title="New Story">
-    <Subtitle>Pick a storyteller and begin a draft.</Subtitle>
+    <Subtitle>Begin a draft.</Subtitle>
 </PageHeader>
 
 <div class="card" style="max-width: 640px;">
-    @if (StorytellerList.Count == 0)
-    {
-        <EmptyState Title="No storytellers yet">
-            <ChildContent>
-                <a href="/storytellers/new" class="btn btn-accent">Create your first storyteller</a>
-            </ChildContent>
-        </EmptyState>
-    }
-    else
-    {
-        <div class="field">
-            <label for="storyteller">Storyteller</label>
-            <select id="storyteller" @bind="SelectedStorytellerId">
-                <option value="0">Select a storyteller…</option>
-                @foreach (var s in StorytellerList)
-                {
-                    <option value="@s.Id">@s.Name (@s.ModelName)</option>
-                }
-            </select>
-        </div>
-        <button class="btn btn-accent" @onclick="StartNewDraft" disabled="@(SelectedStorytellerId == 0)">
-            &#x2726; Start draft
-        </button>
-    }
+    <button class="btn btn-accent" @onclick="StartNewDraft">
+        &#x2726; Start a new story
+    </button>
 </div>
 
 @if (DraftList.Count > 0)
@@ -58,9 +35,7 @@
 }
 
 @code {
-    private List<Storyteller> StorytellerList { get; set; } = [];
     private List<Draft> DraftList { get; set; } = [];
-    private int SelectedStorytellerId { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -70,14 +45,12 @@
             return;
         }
 
-        StorytellerList = await Db.Storytellers.OrderBy(s => s.Name).ToListAsync();
         DraftList = await Drafts.GetDraftsAsync();
     }
 
     private async Task StartNewDraft()
     {
-        if (SelectedStorytellerId == 0) return;
-        var draft = await Drafts.CreateDraftAsync(SelectedStorytellerId);
+        var draft = await Drafts.CreateDraftAsync();
         Nav.NavigateSafe($"/stories/draft/{draft.Id}");
     }
 }

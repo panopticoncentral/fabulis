@@ -4,8 +4,9 @@ namespace Fabulis.Server.Data;
 
 public class DraftService(FabulisDbContext db)
 {
-    public async Task<Draft> CreateDraftAsync(int storytellerId)
+    public async Task<Draft> CreateDraftAsync()
     {
+        var storytellerId = await db.Storytellers.Select(s => s.Id).SingleAsync();
         var draft = new Draft
         {
             StorytellerID = storytellerId,

@@ -29,7 +29,6 @@ else
             <p class="label" style="margin-bottom: var(--space-2);">Your library</p>
             <div class="stat-row"><span>Stories</span><span class="stat-value">@StoryCount</span></div>
             <div class="stat-row"><span>Drafts</span><span class="stat-value">@DraftCount</span></div>
-            <div class="stat-row"><span>Storytellers</span><span class="stat-value">@StorytellerCount</span></div>
         </div>
     </div>
 
@@ -52,7 +51,6 @@ else
     private Draft? LatestDraft { get; set; }
     private int StoryCount { get; set; }
     private int DraftCount { get; set; }
-    private int StorytellerCount { get; set; }
 
     private record RecentStory(int Id, string Title, DateTime CreatedAt, Category? Category, DateTime? LatestVersionAt);
 
@@ -67,7 +65,6 @@ else
         DraftCount = drafts.Count;
 
         StoryCount = await Db.Stories.CountAsync();
-        StorytellerCount = await Db.Storytellers.CountAsync();
 
         var stories = await Db.Stories
             .Include(s => s.Category)

@@ -77,5 +77,27 @@ public class FabulisDbContext : DbContext
                 FOREIGN KEY (DraftId) REFERENCES Drafts(Id) ON DELETE CASCADE
             )
             """);
+
+        await SeedDefaultStorytellerIfMissingAsync();
+    }
+
+    private async Task SeedDefaultStorytellerIfMissingAsync()
+    {
+        if (await Storytellers.AnyAsync()) return;
+
+        var assistantModel = await AppSettings
+            .Where(s => s.Key == "AssistantModel")
+            .Select(s => s.Value)
+            .FirstOrDefaultAsync();
+
+        Storytellers.Add(new Storyteller
+        {
+            Name = "Storyteller",
+            Prompt = "You are a helpful storyteller.",
+            ModelName = string.IsNullOrWhiteSpace(assistantModel) ? "anthropic/claude-sonnet-4" : assistantModel,
+            Temperature = 0.7,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await SaveChangesAsync();
     }
 }
