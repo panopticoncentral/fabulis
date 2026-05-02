@@ -1,6 +1,8 @@
+using Fabulis.Server.Auth;
+
 namespace Fabulis.Server.Data;
 
-public class VaultService
+public class VaultService(SessionTokenStore tokens)
 {
     private long _lastActivityTicks;
     private int _autoLockMinutes;
@@ -35,6 +37,7 @@ public class VaultService
         Volatile.Write(ref _password, null);
         Volatile.Write(ref _isUnlocked, 0);
         Volatile.Write(ref _autoLockMinutes, 0);
+        tokens.RevokeAll();
     }
 
     public void RecordActivity()

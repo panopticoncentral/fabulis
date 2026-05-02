@@ -1,9 +1,11 @@
+using Fabulis.Server.Api;
 using Fabulis.Server.Components;
 using Fabulis.Server.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddSingleton<Fabulis.Server.Auth.SessionTokenStore>();
 builder.Services.AddSingleton<VaultService>();
 builder.Services.AddHostedService<AutoLockService>();
 builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
@@ -56,6 +58,13 @@ app.Use(async (context, next) =>
 
     await next();
 });
+
+var api = app.MapGroup("/api/v1").DisableAntiforgery();
+api.MapAuthEndpoints();
+api.MapLibraryEndpoints();
+api.MapStoryEndpoints();
+api.MapSettingsEndpoints();
+api.MapStorytellerEndpoints();
 
 app.UseAntiforgery();
 app.MapStaticAssets();
