@@ -1,9 +1,19 @@
 import Foundation
 import Security
 
-enum KeychainError: Error {
+enum KeychainError: Error, LocalizedError {
     case unknown(OSStatus)
     case invalidData
+
+    var errorDescription: String? {
+        switch self {
+        case .unknown(let status):
+            let message = SecCopyErrorMessageString(status, nil) as String? ?? "no message"
+            return "Keychain error \(status): \(message)"
+        case .invalidData:
+            return "Keychain returned data that could not be decoded as UTF-8."
+        }
+    }
 }
 
 actor KeychainService {
