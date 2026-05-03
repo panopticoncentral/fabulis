@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Fabulis.Server.Data;
 
@@ -6,6 +7,34 @@ public class FabulisDbContext : DbContext
 {
     public FabulisDbContext(DbContextOptions<FabulisDbContext> options) : base(options)
     {
+    }
+
+    // Every DateTime in this database is UTC by convention (writes always use
+    // DateTime.UtcNow). SQLite stores DateTime as TEXT; without explicit kind
+    // labeling, EF reads them back as DateTimeKind.Unspecified and
+    // System.Text.Json then serializes them WITHOUT a trailing 'Z' or offset,
+    // which Foundation's ISO8601DateFormatter rejects on the client. Rebrand
+    // both directions as UTC so the wire format is always Z-terminated.
+    private sealed class UtcDateTimeConverter : ValueConverter<DateTime, DateTime>
+    {
+        public UtcDateTimeConverter() : base(
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc),
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+        { }
+    }
+
+    private sealed class UtcNullableDateTimeConverter : ValueConverter<DateTime?, DateTime?>
+    {
+        public UtcNullableDateTimeConverter() : base(
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : (DateTime?)null,
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : (DateTime?)null)
+        { }
+    }
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+        configurationBuilder.Properties<DateTime?>().HaveConversion<UtcNullableDateTimeConverter>();
     }
 
     public DbSet<Category> Categories => Set<Category>();
