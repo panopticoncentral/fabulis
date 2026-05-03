@@ -12,6 +12,9 @@ struct DraftView: View {
     @State private var errorMessage: String?
     @State private var showSaveSheet = false
     @State private var editingMessage: DraftMessageDto?
+    /// Auto-scrolls the message list as new chunks arrive. Pauses when the user
+    /// scrolls away from the bottom; resumes when they scroll back.
+    @State private var autoScroll = true
     @FocusState private var promptFocused: Bool
 
     var body: some View {
@@ -54,11 +57,19 @@ struct DraftView: View {
                     }
                     .padding()
                 }
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    let bottomEdge = geometry.contentOffset.y + geometry.containerSize.height
+                    return geometry.contentSize.height - bottomEdge < 60
+                } action: { _, isAtBottom in
+                    autoScroll = isAtBottom
+                }
                 .onChange(of: streamingContent) {
-                    withAnimation { proxy.scrollTo("streaming", anchor: .bottom) }
+                    if autoScroll {
+                        withAnimation { proxy.scrollTo("streaming", anchor: .bottom) }
+                    }
                 }
                 .onChange(of: draft?.messages.count ?? 0) {
-                    if let last = draft?.messages.last {
+                    if autoScroll, let last = draft?.messages.last {
                         withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                     }
                 }
@@ -143,6 +154,7 @@ struct DraftView: View {
         streamingContent = ""
         inFlightPrompt = inFlight
         isStreaming = true
+        autoScroll = true
 
         streamTask = Task {
             do {
