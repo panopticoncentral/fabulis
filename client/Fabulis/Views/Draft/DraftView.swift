@@ -84,12 +84,18 @@ struct DraftView: View {
                     .focused($promptFocused)
                     .disabled(isStreaming)
                 Button {
-                    Task { await submit() }
+                    if isStreaming {
+                        streamTask?.cancel()
+                    } else {
+                        Task { await submit() }
+                    }
                 } label: {
-                    Image(systemName: "paperplane.fill").padding(.horizontal, 4)
+                    Image(systemName: isStreaming ? "stop.fill" : "paperplane.fill")
+                        .padding(.horizontal, 4)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isStreaming)
+                .tint(isStreaming ? .red : .accentColor)
+                .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding()
         }
@@ -168,6 +174,8 @@ struct DraftView: View {
                     default: break
                     }
                 }
+            } catch is CancellationError {
+                // User tapped Stop — partial response is persisted server-side.
             } catch {
                 errorMessage = error.localizedDescription
             }

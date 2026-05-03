@@ -9,20 +9,7 @@ delete it from here.
 
 ## Functional gaps
 
-### 1. Cancel-in-flight UI
-
-No "stop" button while a generation is streaming. The streaming `Task`
-is cancelled implicitly when the user navigates away from the draft
-(`.onDisappear` in `client/Fabulis/Views/Draft/DraftView.swift`), but
-there's no in-page way to interrupt without leaving. Server endpoint
-already handles `OperationCanceledException` and persists partial
-content, so the wiring on the server is done; only the button + its
-state plumbing in `DraftView` is missing.
-
-Originally deferred in the Phase 3 plan
-(`docs/superpowers/plans/2026-05-02-phase3-drafts-streaming.md`).
-
-### 2. Reasoning chunks UI
+### Reasoning chunks UI
 
 The SSE protocol carries reasoning chunks (`reasoning: true` envelope
 field) and the server emits them for thinking-capable models. The
@@ -32,7 +19,7 @@ client silently drops them in the `case "chunk":` branch of
 
 Originally deferred in the Phase 3 plan.
 
-### 3. Streaming-resume on reconnect
+### Streaming-resume on reconnect
 
 If the SSE connection drops mid-generation (long backgrounding, network
 blip), the client can't re-subscribe to the live stream. The server's
@@ -46,7 +33,7 @@ and re-subscribe instead of giving up.
 
 Originally deferred in the Phase 3 plan.
 
-### 4. Import / export
+### Import / export
 
 Phase 4 deleted the Blazor `/import` and `/export` pages plus their
 filesystem-path-based services (`CategoryImportService`,
@@ -65,7 +52,7 @@ Originally deferred in the Phase 4 plan
 
 ## Posture / hardening
 
-### 5. Scoped TLS posture
+### Scoped TLS posture
 
 `client/Fabulis/Info.plist` currently uses `NSAllowsLocalNetworking =
 YES`, which permits HTTP to *any* `.local` / private-IP host. Tighter
@@ -84,7 +71,7 @@ Originally deferred in the Phase 2 plan
 These are baked into the design. Changing any of them is a separate
 sub-project, not a fix.
 
-### 6. Mac via Catalyst, not native macOS
+### Mac via Catalyst, not native macOS
 
 One codebase, one App Store record, one bundle ID. A real `os(macOS)`
 target would mean adding `#if os(macOS)` branches for menus, settings
@@ -93,7 +80,7 @@ Worth doing only if Mac becomes the primary platform.
 
 Source: architecture spec.
 
-### 7. Thin client, no offline read
+### Thin client, no offline read
 
 Every navigation hits the server. Caching the library + recent stories
 on-device (SwiftData mirror) would enable offline browsing but adds a
@@ -102,17 +89,17 @@ under iOS Data Protection.
 
 Source: architecture spec.
 
-### 8. Single-user, no signup
+### Single-user, no signup
 
 The vault password is the only credential. No user accounts, no
 permission model.
 
 Source: architecture spec.
 
-### 9. LAN-only server
+### LAN-only server
 
 No public-internet exposure design. Running on the open internet would
-need TLS (item 5) plus a stronger auth posture and probably rate
-limiting.
+need TLS (see Scoped TLS posture above) plus a stronger auth posture
+and probably rate limiting.
 
 Source: architecture spec.
