@@ -41,4 +41,11 @@ final class AppState {
         try? await api.lock()
         phase = .needsAuth
     }
+
+    func resetServer() async {
+        try? await api.lock()
+        try? await keychain.deleteSessionToken()
+        try? await keychain.deleteServerURL()
+        phase = .needsOnboarding
+    }
 }

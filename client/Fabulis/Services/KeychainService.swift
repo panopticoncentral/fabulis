@@ -27,6 +27,7 @@ actor KeychainService {
 
     func saveServerURL(_ url: String) throws { try save(account: serverURLAccount, value: url) }
     func loadServerURL() throws -> String? { try load(account: serverURLAccount) }
+    func deleteServerURL() throws { try delete(account: serverURLAccount) }
 
     func saveSessionToken(_ token: String) throws { try save(account: sessionTokenAccount, value: token) }
     func loadSessionToken() throws -> String? { try load(account: sessionTokenAccount) }

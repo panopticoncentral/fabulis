@@ -77,11 +77,30 @@ actor FabulisAPIClient {
     }
 
     func unlock(serverURL: String, password: String) async throws -> UnlockResponse {
+        // Hit the server FIRST so a failed unlock (bad URL, server down, wrong
+        // password) doesn't leave a half-configured identity in Keychain that
+        // would trap the user on UnlockPromptView with no way to edit the URL.
+        let resp = try await postUnlock(serverURL: serverURL, password: password)
         try await keychain.saveServerURL(serverURL)
-        struct Body: Encodable { let password: String }
-        let resp: UnlockResponse = try await request("POST", path: "/auth/unlock", body: Body(password: password), authed: false)
         try await keychain.saveSessionToken(resp.token)
         return resp
+    }
+
+    private func postUnlock(serverURL: String, password: String) async throws -> UnlockResponse {
+        guard var components = URLComponents(string: serverURL) else { throw APIError.invalidURL }
+        let base = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+        components.path = base + "/api/v1/auth/unlock"
+        guard let url = components.url else { throw APIError.invalidURL }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        struct Body: Encodable { let password: String }
+        req.httpBody = try encoder.encode(Body(password: password))
+        let (data, response) = try await transport(req)
+        try validate(response: response, data: data)
+        do { return try decoder.decode(UnlockResponse.self, from: data) } catch { throw APIError.decoding(error) }
     }
 
     func authStatus() async throws -> AuthStatusResponse {

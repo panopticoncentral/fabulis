@@ -31,6 +31,12 @@ struct UnlockPromptView: View {
                 .controlSize(.large)
                 .disabled(password.isEmpty || isSubmitting)
                 .padding(.horizontal)
+                Button("Use a different server") {
+                    Task { await appState.resetServer() }
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .disabled(isSubmitting)
             }
             .padding(.top, 80)
             .task {
