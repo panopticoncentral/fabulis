@@ -76,28 +76,7 @@ struct DraftView: View {
             }
 
             Divider()
-
-            HStack(alignment: .bottom, spacing: 8) {
-                TextField("Prompt", text: $prompt, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...5)
-                    .focused($promptFocused)
-                    .disabled(isStreaming)
-                Button {
-                    if isStreaming {
-                        streamTask?.cancel()
-                    } else {
-                        Task { await submit() }
-                    }
-                } label: {
-                    Image(systemName: isStreaming ? "stop.fill" : "paperplane.fill")
-                        .padding(.horizontal, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(isStreaming ? .red : .accentColor)
-                .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding()
+            inputBar
         }
         .navigationTitle(draft?.title ?? "New Draft")
         .toolbar {
@@ -120,6 +99,37 @@ struct DraftView: View {
         }
         .task { await loadDraft() }
         .onDisappear { streamTask?.cancel() }
+    }
+
+    private var inputBar: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            TextField("Prompt", text: $prompt, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(1...5)
+                .focused($promptFocused)
+                .disabled(isStreaming)
+                .onKeyPress(keys: [.return]) { keyPress in
+                    if keyPress.modifiers.contains(.shift) { return .ignored }
+                    let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty, !isStreaming else { return .ignored }
+                    Task { await submit() }
+                    return .handled
+                }
+            Button {
+                if isStreaming {
+                    streamTask?.cancel()
+                } else {
+                    Task { await submit() }
+                }
+            } label: {
+                Image(systemName: isStreaming ? "stop.fill" : "paperplane.fill")
+                    .padding(.horizontal, 4)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(isStreaming ? .red : .accentColor)
+            .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding()
     }
 
     private func loadDraft() async {
