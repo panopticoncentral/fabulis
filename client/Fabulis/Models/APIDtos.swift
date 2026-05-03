@@ -78,3 +78,50 @@ struct SettingsDto: Decodable, Sendable {
     let assistantModel: String?
     let autoLockSelection: String
 }
+
+// MARK: - Drafts
+
+struct DraftSummary: Decodable, Identifiable, Sendable {
+    let id: Int
+    let title: String?
+    let createdAt: Date
+    let updatedAt: Date
+    let messageCount: Int
+}
+
+struct DraftDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let title: String?
+    let createdAt: Date
+    let updatedAt: Date
+    let storytellerName: String
+    let modelName: String
+    let messages: [DraftMessageDto]
+}
+
+struct DraftMessageDto: Decodable, Identifiable, Sendable {
+    let id: Int
+    let role: MessageRole
+    let content: String
+    let sortOrder: Int
+}
+
+struct StreamEnvelope: Decodable, Sendable {
+    let kind: String
+    let text: String?
+    let reasoning: Bool?
+    let messageId: Int?
+}
+
+struct SaveDraftRequest: Encodable, Sendable {
+    let categoryId: Int?
+    let newCategoryName: String?
+    let storyId: Int?
+    let newStoryTitle: String?
+}
+
+struct SaveDraftResponse: Decodable, Sendable {
+    let storyId: Int
+    let versionId: Int
+    let versionNumber: Int
+}

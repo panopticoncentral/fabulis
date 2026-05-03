@@ -65,6 +65,7 @@ api.MapLibraryEndpoints();
 api.MapStoryEndpoints();
 api.MapSettingsEndpoints();
 api.MapStorytellerEndpoints();
+api.MapDraftEndpoints();
 
 app.UseAntiforgery();
 app.MapStaticAssets();

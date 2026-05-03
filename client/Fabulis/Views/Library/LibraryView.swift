@@ -2,14 +2,29 @@ import SwiftUI
 
 struct LibraryView: View {
     @State private var categories: [CategorySummary] = []
+    @State private var drafts: [DraftSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var creatingDraft = false
+    @State private var pendingNewDraftId: Int?
 
     var body: some View {
         NavigationStack {
             content
                 .navigationTitle("Library")
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            Task { await createDraft() }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if creatingDraft { ProgressView().controlSize(.mini) }
+                                else { Image(systemName: "plus") }
+                                Text("New Draft")
+                            }
+                        }
+                        .disabled(creatingDraft)
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         NavigationLink(destination: SettingsView()) {
                             Image(systemName: "gear")
@@ -19,6 +34,17 @@ struct LibraryView: View {
                 .navigationDestination(for: CategorySummary.self) { category in
                     CategoryView(categoryId: category.id, categoryName: category.name)
                 }
+                .navigationDestination(for: DraftSummary.self) { draft in
+                    DraftView(draftId: draft.id)
+                }
+                .navigationDestination(isPresented: Binding(
+                    get: { pendingNewDraftId != nil },
+                    set: { if !$0 { pendingNewDraftId = nil } }
+                )) {
+                    if let id = pendingNewDraftId {
+                        DraftView(draftId: id)
+                    }
+                }
                 .task { await load() }
                 .refreshable { await load() }
         }
@@ -26,7 +52,7 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var content: some View {
-        if isLoading && categories.isEmpty {
+        if isLoading && categories.isEmpty && drafts.isEmpty {
             ProgressView()
         } else if let errorMessage {
             VStack(spacing: 12) {
@@ -35,20 +61,40 @@ struct LibraryView: View {
                 Button("Retry") { Task { await load() } }
             }
             .padding()
-        } else if categories.isEmpty {
-            ContentUnavailableView("Empty library", systemImage: "books.vertical",
-                description: Text("Create categories from the web UI to see them here."))
         } else {
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 16)], spacing: 16) {
-                    ForEach(categories) { category in
-                        NavigationLink(value: category) {
-                            CategoryCard(category: category)
+            List {
+                if !drafts.isEmpty {
+                    Section("Drafts") {
+                        ForEach(drafts) { draft in
+                            NavigationLink(value: draft) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(draft.title ?? "Untitled draft").font(.body)
+                                    Text("\(draft.messageCount) message\(draft.messageCount == 1 ? "" : "s") · \(draft.updatedAt.formatted(date: .abbreviated, time: .shortened))")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding()
+                if categories.isEmpty {
+                    Section {
+                        ContentUnavailableView("No categories",
+                            systemImage: "books.vertical",
+                            description: Text("Save a draft to a category to see it here."))
+                    }
+                } else {
+                    Section("Library") {
+                        ForEach(categories) { category in
+                            NavigationLink(value: category) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(category.name).font(.body)
+                                    Text("\(category.storyCount) \(category.storyCount == 1 ? "story" : "stories")")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -56,8 +102,10 @@ struct LibraryView: View {
     private func load() async {
         do {
             errorMessage = nil
-            let resp = try await FabulisAPIClient.shared.library()
-            categories = resp.categories
+            async let lib = FabulisAPIClient.shared.library()
+            async let drafs = FabulisAPIClient.shared.listDrafts()
+            categories = try await lib.categories
+            drafts = try await drafs
         } catch APIError.unauthorized {
             errorMessage = "Session expired."
         } catch {
@@ -65,9 +113,25 @@ struct LibraryView: View {
         }
         isLoading = false
     }
+
+    private func createDraft() async {
+        creatingDraft = true
+        defer { creatingDraft = false }
+        do {
+            let draft = try await FabulisAPIClient.shared.createDraft()
+            pendingNewDraftId = draft.id
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 extension CategorySummary: Hashable {
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
     public static func == (lhs: CategorySummary, rhs: CategorySummary) -> Bool { lhs.id == rhs.id }
+}
+
+extension DraftSummary: Hashable {
+    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    public static func == (lhs: DraftSummary, rhs: DraftSummary) -> Bool { lhs.id == rhs.id }
 }

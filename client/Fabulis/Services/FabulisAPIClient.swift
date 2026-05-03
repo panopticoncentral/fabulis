@@ -74,6 +74,69 @@ actor FabulisAPIClient {
         try await request("GET", path: "/stories/\(storyId)/versions/\(version)", authed: true)
     }
 
+    func listDrafts() async throws -> [DraftSummary] {
+        try await request("GET", path: "/drafts", authed: true)
+    }
+
+    func createDraft() async throws -> DraftDetail {
+        struct Empty: Encodable {}
+        return try await request("POST", path: "/drafts", body: Empty(), authed: true)
+    }
+
+    func getDraft(id: Int) async throws -> DraftDetail {
+        try await request("GET", path: "/drafts/\(id)", authed: true)
+    }
+
+    func deleteDraft(id: Int) async throws {
+        try await requestVoid("DELETE", path: "/drafts/\(id)", authed: true)
+    }
+
+    func saveDraft(id: Int, request body: SaveDraftRequest) async throws -> SaveDraftResponse {
+        try await self.request("POST", path: "/drafts/\(id)/save", body: body, authed: true)
+    }
+
+    /// Streams `StreamEnvelope` events from POST /drafts/{id}/messages.
+    /// Caller stops by cancelling the consuming Task.
+    func streamMessage(draftId: Int, prompt: String) -> AsyncThrowingStream<StreamEnvelope, Error> {
+        let session = self.session
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    struct Body: Encodable { let prompt: String }
+                    let req = try await self.buildRequest(method: "POST", path: "/drafts/\(draftId)/messages", body: Body(prompt: prompt), authed: true)
+                    let (bytes, response) = try await session.bytes(for: req)
+                    if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+                        continuation.finish(throwing: APIError.unauthorized); return
+                    }
+                    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                        continuation.finish(throwing: APIError.server(status: http.statusCode, body: nil)); return
+                    }
+                    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+                    for try await line in bytes.lines {
+                        try Task.checkCancellation()
+                        guard line.hasPrefix("data: ") else { continue }
+                        let payload = String(line.dropFirst("data: ".count))
+                        if let data = payload.data(using: .utf8) {
+                            do {
+                                let env = try dec.decode(StreamEnvelope.self, from: data)
+                                continuation.yield(env)
+                                if env.kind == "done" || env.kind == "error" { break }
+                            } catch {
+                                // skip malformed line
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     private func request<T: Decodable>(_ method: String, path: String, authed: Bool) async throws -> T {
         return try await request(method, path: path, body: Optional<EmptyBody>.none, authed: authed)
     }

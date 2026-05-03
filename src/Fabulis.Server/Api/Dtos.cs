@@ -91,3 +91,45 @@ public sealed record StorytellerUpdateRequest(
     double? MinP,
     int? TopK,
     double? TopA);
+
+// ---------- drafts ----------
+public sealed record DraftSummaryDto(
+    int Id,
+    string? Title,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    int MessageCount);
+
+public sealed record DraftDto(
+    int Id,
+    string? Title,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    string StorytellerName,
+    string ModelName,
+    IReadOnlyList<DraftMessageDto> Messages);
+
+public sealed record DraftMessageDto(
+    int Id,
+    MessageRole Role,
+    string Content,
+    int SortOrder);
+
+public sealed record StreamPromptRequest(string Prompt);
+
+public sealed record StreamEnvelope(
+    string Kind,
+    string? Text,
+    bool? Reasoning,
+    int? MessageId);
+
+public sealed record SaveDraftRequest(
+    int? CategoryId,
+    string? NewCategoryName,
+    int? StoryId,
+    string? NewStoryTitle);
+
+public sealed record SaveDraftResponse(
+    int StoryId,
+    int VersionId,
+    int VersionNumber);
