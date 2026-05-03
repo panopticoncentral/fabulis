@@ -4,9 +4,13 @@ struct CategoryView: View {
     let categoryId: Int
     let categoryName: String
 
+    @Environment(\.dismiss) private var dismiss
     @State private var detail: CategoryDetail?
     @State private var errorMessage: String?
     @State private var isLoading = true
+    @State private var showingRenameSheet = false
+    @State private var showingDeleteConfirm = false
+    @State private var deleting = false
 
     var body: some View {
         Group {
@@ -19,7 +23,7 @@ struct CategoryView: View {
                         NavigationLink(value: story) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(story.title).font(.body)
-                                Text(formatDate(story.createdAt))
+                                Text(story.createdAt.formatted(date: .abbreviated, time: .omitted))
                                     .font(.caption2).foregroundStyle(.secondary)
                             }
                         }
@@ -36,10 +40,35 @@ struct CategoryView: View {
                 .padding()
             }
         }
-        .navigationTitle(categoryName)
+        .navigationTitle(detail?.name ?? categoryName)
         .navigationDestination(for: StorySummary.self) { story in
             StoryView(storyId: story.id, fallbackTitle: story.title)
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showingRenameSheet = true } label: { Label("Rename", systemImage: "pencil") }
+                    Button(role: .destructive) { showingDeleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        .sheet(isPresented: $showingRenameSheet) {
+            EditCategorySheet(
+                mode: .rename(id: categoryId),
+                initialName: detail?.name ?? categoryName,
+                onSaved: { Task { await load() } })
+        }
+        .alert("Delete category?",
+               isPresented: $showingDeleteConfirm,
+               actions: {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) { Task { await deleteCategory() } }
+               },
+               message: {
+                    Text("This deletes the category and all its stories. This cannot be undone.")
+               })
         .task { await load() }
         .refreshable { await load() }
     }
@@ -53,13 +82,19 @@ struct CategoryView: View {
         }
         isLoading = false
     }
+
+    private func deleteCategory() async {
+        deleting = true; defer { deleting = false }
+        do {
+            try await FabulisAPIClient.shared.deleteCategory(id: categoryId)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
 
 extension StorySummary: Hashable {
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
     public static func == (lhs: StorySummary, rhs: StorySummary) -> Bool { lhs.id == rhs.id }
-}
-
-private func formatDate(_ date: Date) -> String {
-    date.formatted(date: .abbreviated, time: .omitted)
 }

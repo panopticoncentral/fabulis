@@ -7,6 +7,7 @@ struct LibraryView: View {
     @State private var errorMessage: String?
     @State private var creatingDraft = false
     @State private var pendingNewDraftId: Int?
+    @State private var showingNewCategorySheet = false
 
     var body: some View {
         NavigationStack {
@@ -25,11 +26,19 @@ struct LibraryView: View {
                         }
                         .disabled(creatingDraft)
                     }
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button { showingNewCategorySheet = true } label: {
+                            Image(systemName: "folder.badge.plus")
+                        }
                         NavigationLink(destination: SettingsView()) {
                             Image(systemName: "gear")
                         }
                     }
+                }
+                .sheet(isPresented: $showingNewCategorySheet) {
+                    EditCategorySheet(mode: .create, initialName: "", onSaved: {
+                        Task { await load() }
+                    })
                 }
                 .navigationDestination(for: CategorySummary.self) { category in
                     CategoryView(categoryId: category.id, categoryName: category.name)

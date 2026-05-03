@@ -125,3 +125,44 @@ struct SaveDraftResponse: Decodable, Sendable {
     let versionId: Int
     let versionNumber: Int
 }
+
+// MARK: - Settings, models, storyteller
+
+struct ModelInfo: Decodable, Identifiable, Sendable {
+    let id: String
+    let name: String
+}
+
+struct StorytellerDto: Decodable, Sendable {
+    let id: Int
+    let name: String
+    let prompt: String
+    let modelName: String
+    let temperature: Double
+    let topP: Double?
+    let maxTokens: Int?
+    let minP: Double?
+    let topK: Int?
+    let topA: Double?
+}
+
+struct StorytellerUpdateRequest: Encodable, Sendable {
+    let name: String
+    let prompt: String
+    let modelName: String
+    let temperature: Double
+    let topP: Double?
+    let maxTokens: Int?
+    let minP: Double?
+    let topK: Int?
+    let topA: Double?
+}
+
+struct CreateCategoryRequest: Encodable, Sendable { let name: String }
+struct RenameCategoryRequest: Encodable, Sendable { let name: String }
+
+struct SettingsUpdateRequest: Encodable, Sendable {
+    let apiKey: String?
+    let assistantModel: String?
+    let autoLockSelection: String?
+}

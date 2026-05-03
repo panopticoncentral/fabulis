@@ -95,6 +95,80 @@ actor FabulisAPIClient {
         try await self.request("POST", path: "/drafts/\(id)/save", body: body, authed: true)
     }
 
+    func deleteDraftMessage(draftId: Int, messageId: Int) async throws {
+        try await requestVoid("DELETE", path: "/drafts/\(draftId)/messages/\(messageId)", authed: true)
+    }
+
+    func regenerate(draftId: Int) -> AsyncThrowingStream<StreamEnvelope, Error> {
+        let session = self.session
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    struct Empty: Encodable {}
+                    let req = try await self.buildRequest(method: "POST", path: "/drafts/\(draftId)/regenerate", body: Empty(), authed: true)
+                    let (bytes, response) = try await session.bytes(for: req)
+                    if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+                        continuation.finish(throwing: APIError.unauthorized); return
+                    }
+                    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                        continuation.finish(throwing: APIError.server(status: http.statusCode, body: nil)); return
+                    }
+                    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+                    for try await line in bytes.lines {
+                        try Task.checkCancellation()
+                        guard line.hasPrefix("data: ") else { continue }
+                        let payload = String(line.dropFirst("data: ".count))
+                        if let data = payload.data(using: .utf8) {
+                            do {
+                                let env = try dec.decode(StreamEnvelope.self, from: data)
+                                continuation.yield(env)
+                                if env.kind == "done" || env.kind == "error" { break }
+                            } catch { /* skip malformed line */ }
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func createCategory(name: String) async throws -> CategorySummary {
+        try await request("POST", path: "/categories", body: CreateCategoryRequest(name: name), authed: true)
+    }
+
+    func renameCategory(id: Int, name: String) async throws {
+        try await requestVoid("PUT", path: "/categories/\(id)", body: RenameCategoryRequest(name: name), authed: true)
+    }
+
+    func deleteCategory(id: Int) async throws {
+        try await requestVoid("DELETE", path: "/categories/\(id)", authed: true)
+    }
+
+    func settings() async throws -> SettingsDto {
+        try await request("GET", path: "/settings", authed: true)
+    }
+
+    func updateSettings(_ body: SettingsUpdateRequest) async throws {
+        try await requestVoid("PUT", path: "/settings", body: body, authed: true)
+    }
+
+    func models() async throws -> [ModelInfo] {
+        try await request("GET", path: "/models", authed: true)
+    }
+
+    func getStoryteller() async throws -> StorytellerDto {
+        try await request("GET", path: "/storyteller", authed: true)
+    }
+
+    func updateStoryteller(_ body: StorytellerUpdateRequest) async throws {
+        try await requestVoid("PUT", path: "/storyteller", body: body, authed: true)
+    }
+
     /// Streams `StreamEnvelope` events from POST /drafts/{id}/messages.
     /// Caller stops by cancelling the consuming Task.
     func streamMessage(draftId: Int, prompt: String) -> AsyncThrowingStream<StreamEnvelope, Error> {
@@ -150,6 +224,12 @@ actor FabulisAPIClient {
 
     private func requestVoid(_ method: String, path: String, authed: Bool) async throws {
         let req = try await buildRequest(method: method, path: path, body: Optional<EmptyBody>.none, authed: authed)
+        let (data, response) = try await transport(req)
+        try validate(response: response, data: data)
+    }
+
+    private func requestVoid<B: Encodable>(_ method: String, path: String, body: B, authed: Bool) async throws {
+        let req = try await buildRequest(method: method, path: path, body: body, authed: authed)
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
     }

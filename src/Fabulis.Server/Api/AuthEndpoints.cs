@@ -1,5 +1,4 @@
 using Fabulis.Server.Auth;
-using Fabulis.Server.Components.Pages;
 using Fabulis.Server.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +6,15 @@ namespace Fabulis.Server.Api;
 
 public static class AuthEndpoints
 {
+    private static int? ParseAutoLockMinutes(string? raw)
+    {
+        if (string.Equals(raw, "never", StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (int.TryParse(raw, out var parsed) && parsed is 1 or 5 or 15 or 30 or 60)
+            return parsed;
+        return 15;
+    }
+
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/auth");
@@ -30,7 +38,7 @@ public static class AuthEndpoints
                 await db.EnsureSchemaUpdatedAsync();
 
                 var setting = await db.AppSettings.FindAsync("AutoLockMinutes");
-                vault.ConfigureAutoLock(Unlock.ParseAutoLockMinutes(setting?.Value));
+                vault.ConfigureAutoLock(ParseAutoLockMinutes(setting?.Value));
             }
             catch
             {

@@ -147,6 +147,73 @@ public static class DraftEndpoints
             return Results.Ok(new SaveDraftResponse(version.StoryId, version.Id, version.VersionNumber));
         });
 
+        group.MapDelete("/{draftId:int}/messages/{messageId:int}", async (
+            int draftId,
+            int messageId,
+            DraftService drafts) =>
+        {
+            await drafts.DeleteMessageAndSubsequentAsync(messageId);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/{id:int}/regenerate", async (
+            int id,
+            DraftService drafts,
+            OpenRouterService openRouter,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var initial = await drafts.GetDraftAsync(id);
+            if (initial is null) return Results.NotFound();
+
+            await drafts.DeleteLastResponseAsync(id);
+            var draft = await drafts.GetDraftAsync(id);
+            if (draft is null || draft.Messages.Count == 0)
+                return Results.BadRequest(new { error = "no messages to regenerate from" });
+
+            http.Response.ContentType = "text/event-stream";
+            http.Response.Headers.CacheControl = "no-cache";
+            http.Response.Headers["X-Accel-Buffering"] = "no";
+
+            var content = new StringBuilder();
+            var storyteller = draft.Storyteller;
+
+            try
+            {
+                await foreach (var chunk in openRouter.ChatStreamAsync(
+                    storyteller.ModelName, storyteller.Prompt, draft.Messages.ToList(),
+                    storyteller.Temperature, storyteller.TopP, storyteller.MaxTokens,
+                    storyteller.MinP, storyteller.TopK, storyteller.TopA, ct))
+                {
+                    var isReasoning = chunk.Kind == StreamChunkKind.Reasoning;
+                    if (!isReasoning) content.Append(chunk.Text);
+                    await WriteEnvelope(http, new StreamEnvelope("chunk", chunk.Text, isReasoning, null), ct);
+                }
+
+                int? savedId = null;
+                if (content.Length > 0)
+                {
+                    var saved = await drafts.AddMessageAsync(id, MessageRole.Response, content.ToString());
+                    savedId = saved.Id;
+                }
+                await WriteEnvelope(http, new StreamEnvelope("done", null, null, savedId), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                if (content.Length > 0)
+                {
+                    var saved = await drafts.AddMessageAsync(id, MessageRole.Response, content.ToString());
+                    await WriteEnvelope(http, new StreamEnvelope("done", null, null, saved.Id), CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                await WriteEnvelope(http, new StreamEnvelope("error", ex.Message, null, null), CancellationToken.None);
+            }
+
+            return Results.Empty;
+        });
+
         return routes;
     }
 

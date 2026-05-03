@@ -18,8 +18,20 @@ struct DraftView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         if let draft {
-                            ForEach(draft.messages) { msg in
-                                DraftMessageView(message: msg).id(msg.id)
+                            ForEach(Array(draft.messages.enumerated()), id: \.element.id) { idx, msg in
+                                let isLast = idx == draft.messages.count - 1
+                                let isLastResponse = isLast && msg.role == .response
+                                DraftMessageView(message: msg) {
+                                    Button(role: .destructive) {
+                                        Task { await deleteMessage(msg.id) }
+                                    } label: { Label("Delete and after", systemImage: "trash") }
+                                    if isLastResponse {
+                                        Button {
+                                            Task { await regenerate() }
+                                        } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
+                                    }
+                                }
+                                .id(msg.id)
                             }
                         }
                         if isStreaming {
@@ -106,6 +118,42 @@ struct DraftView: View {
                         errorMessage = env.text ?? "Unknown error"
                     default:
                         break
+                    }
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
+            streamingContent = ""
+            isStreaming = false
+        }
+    }
+
+    private func deleteMessage(_ messageId: Int) async {
+        do {
+            try await FabulisAPIClient.shared.deleteDraftMessage(draftId: draftId, messageId: messageId)
+            draft = try await FabulisAPIClient.shared.getDraft(id: draftId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func regenerate() async {
+        errorMessage = nil
+        streamingContent = ""
+        isStreaming = true
+
+        let stream = await FabulisAPIClient.shared.regenerate(draftId: draftId)
+        streamTask = Task {
+            do {
+                for try await env in stream {
+                    if Task.isCancelled { break }
+                    switch env.kind {
+                    case "chunk":
+                        if env.reasoning != true, let text = env.text { streamingContent += text }
+                    case "done": break
+                    case "error": errorMessage = env.text ?? "Unknown error"
+                    default: break
                     }
                 }
             } catch {

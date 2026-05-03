@@ -1,5 +1,4 @@
 using Fabulis.Server.Api;
-using Fabulis.Server.Components;
 using Fabulis.Server.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,42 +19,22 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
     }
 });
 
-builder.Services.AddScoped<CategoryImportService>();
-builder.Services.AddScoped<CategoryExportService>();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<OpenRouterService>();
 builder.Services.AddScoped<DraftService>();
 
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddHubOptions(options =>
-    {
-        options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
-    });
-
 var app = builder.Build();
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
 
 app.Use(async (context, next) =>
 {
     var path = context.Request.Path.Value;
-    var isInfra = path is not null && (
-        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/_content", StringComparison.OrdinalIgnoreCase));
-
-    if (!isInfra)
+    if (path is null || !path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
     {
-        var vault = context.RequestServices.GetRequiredService<VaultService>();
-        vault.RecordActivity();
+        await next();
+        return;
     }
-
+    var vault = context.RequestServices.GetRequiredService<VaultService>();
+    vault.RecordActivity();
     await next();
 });
 
@@ -66,11 +45,6 @@ api.MapStoryEndpoints();
 api.MapSettingsEndpoints();
 api.MapStorytellerEndpoints();
 api.MapDraftEndpoints();
-
-app.UseAntiforgery();
-app.MapStaticAssets();
-
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+api.MapModelEndpoints();
 
 app.Run();

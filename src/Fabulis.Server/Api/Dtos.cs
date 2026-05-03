@@ -133,3 +133,7 @@ public sealed record SaveDraftResponse(
     int StoryId,
     int VersionId,
     int VersionNumber);
+
+public sealed record CreateCategoryRequest(string Name);
+public sealed record RenameCategoryRequest(string Name);
+public sealed record ModelInfoDto(string Id, string Name);

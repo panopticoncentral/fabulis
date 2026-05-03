@@ -51,6 +51,36 @@ public static class LibraryEndpoints
             return Results.Ok(dto);
         });
 
+        group.MapPost("/categories", async (CreateCategoryRequest body, FabulisDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest(new { error = "name is required" });
+            var cat = new Category { Name = body.Name.Trim(), CreatedAt = DateTime.UtcNow };
+            db.Categories.Add(cat);
+            await db.SaveChangesAsync();
+            return Results.Ok(new CategorySummaryDto(cat.Id, cat.Name, cat.CreatedAt, 0, null));
+        });
+
+        group.MapPut("/categories/{id:int}", async (int id, RenameCategoryRequest body, FabulisDbContext db) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest(new { error = "name is required" });
+            var cat = await db.Categories.FindAsync(id);
+            if (cat is null) return Results.NotFound();
+            cat.Name = body.Name.Trim();
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
+        group.MapDelete("/categories/{id:int}", async (int id, FabulisDbContext db) =>
+        {
+            var cat = await db.Categories.Include(c => c.Stories).FirstOrDefaultAsync(c => c.Id == id);
+            if (cat is null) return Results.NotFound();
+            db.Categories.Remove(cat);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         return routes;
     }
 }
