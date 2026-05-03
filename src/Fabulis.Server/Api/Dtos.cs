@@ -137,3 +137,4 @@ public sealed record SaveDraftResponse(
 public sealed record CreateCategoryRequest(string Name);
 public sealed record RenameCategoryRequest(string Name);
 public sealed record ModelInfoDto(string Id, string Name);
+public sealed record UpdateMessageRequest(string Content);

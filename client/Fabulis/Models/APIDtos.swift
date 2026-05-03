@@ -160,6 +160,7 @@ struct StorytellerUpdateRequest: Encodable, Sendable {
 
 struct CreateCategoryRequest: Encodable, Sendable { let name: String }
 struct RenameCategoryRequest: Encodable, Sendable { let name: String }
+struct UpdateMessageRequest: Encodable, Sendable { let content: String }
 
 struct SettingsUpdateRequest: Encodable, Sendable {
     let apiKey: String?

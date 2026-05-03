@@ -134,6 +134,55 @@ actor FabulisAPIClient {
         try await requestVoid("DELETE", path: "/drafts/\(draftId)/messages/\(messageId)", authed: true)
     }
 
+    func editDraftMessage(draftId: Int, messageId: Int, content: String) async throws {
+        try await requestVoid(
+            "PUT",
+            path: "/drafts/\(draftId)/messages/\(messageId)",
+            body: UpdateMessageRequest(content: content),
+            authed: true)
+    }
+
+    func editAndResubmit(draftId: Int, messageId: Int, content: String) -> AsyncThrowingStream<StreamEnvelope, Error> {
+        let session = self.session
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let req = try await self.buildRequest(
+                        method: "POST",
+                        path: "/drafts/\(draftId)/messages/\(messageId)/edit-and-resubmit",
+                        body: UpdateMessageRequest(content: content),
+                        authed: true)
+                    let (bytes, response) = try await session.bytes(for: req)
+                    if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+                        continuation.finish(throwing: APIError.unauthorized); return
+                    }
+                    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                        continuation.finish(throwing: APIError.server(status: http.statusCode, body: nil)); return
+                    }
+                    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+                    for try await line in bytes.lines {
+                        try Task.checkCancellation()
+                        guard line.hasPrefix("data: ") else { continue }
+                        let payload = String(line.dropFirst("data: ".count))
+                        if let data = payload.data(using: .utf8) {
+                            do {
+                                let env = try dec.decode(StreamEnvelope.self, from: data)
+                                continuation.yield(env)
+                                if env.kind == "done" || env.kind == "error" { break }
+                            } catch { /* skip */ }
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
     func regenerate(draftId: Int) -> AsyncThrowingStream<StreamEnvelope, Error> {
         let session = self.session
         return AsyncThrowingStream { continuation in

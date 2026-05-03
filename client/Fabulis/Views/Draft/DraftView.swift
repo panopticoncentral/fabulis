@@ -11,6 +11,7 @@ struct DraftView: View {
     @State private var streamTask: Task<Void, Never>?
     @State private var errorMessage: String?
     @State private var showSaveSheet = false
+    @State private var editingMessage: DraftMessageDto?
     @FocusState private var promptFocused: Bool
 
     var body: some View {
@@ -23,14 +24,18 @@ struct DraftView: View {
                                 let isLast = idx == draft.messages.count - 1
                                 let isLastResponse = isLast && msg.role == .response
                                 DraftMessageView(message: msg) {
-                                    Button(role: .destructive) {
-                                        Task { await deleteMessage(msg.id) }
-                                    } label: { Label("Delete and after", systemImage: "trash") }
+                                    Button {
+                                        editingMessage = msg
+                                    } label: { Label("Edit", systemImage: "pencil") }
                                     if isLastResponse {
                                         Button {
                                             Task { await regenerate() }
                                         } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
                                     }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        Task { await deleteMessage(msg.id) }
+                                    } label: { Label("Delete and after", systemImage: "trash") }
                                 }
                                 .id(msg.id)
                             }
@@ -87,6 +92,15 @@ struct DraftView: View {
         .sheet(isPresented: $showSaveSheet) {
             SaveDraftSheet(draftId: draftId, draftTitle: draft?.title)
         }
+        .sheet(item: $editingMessage) { msg in
+            EditMessageSheet(
+                draftId: draftId,
+                message: msg,
+                onSaved: { Task { await reloadDraft() } },
+                onSaveAndResubmit: { newContent in
+                    Task { await editAndResubmit(messageId: msg.id, content: newContent) }
+                })
+        }
         .task { await loadDraft() }
         .onDisappear { streamTask?.cancel() }
     }
@@ -100,31 +114,46 @@ struct DraftView: View {
         }
     }
 
+    private func reloadDraft() async {
+        do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
     private func submit() async {
         let pending = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
         prompt = ""
+        let stream = await FabulisAPIClient.shared.streamMessage(draftId: draftId, prompt: pending)
+        runStream(inFlight: pending, from: stream)
+    }
+
+    private func editAndResubmit(messageId: Int, content: String) async {
+        let stream = await FabulisAPIClient.shared.editAndResubmit(
+            draftId: draftId, messageId: messageId, content: content)
+        runStream(inFlight: content, from: stream)
+    }
+
+    private func regenerate() async {
+        let stream = await FabulisAPIClient.shared.regenerate(draftId: draftId)
+        runStream(inFlight: nil, from: stream)
+    }
+
+    private func runStream(inFlight: String?, from stream: AsyncThrowingStream<StreamEnvelope, Error>) {
         errorMessage = nil
         streamingContent = ""
-        inFlightPrompt = pending
+        inFlightPrompt = inFlight
         isStreaming = true
 
-        let stream = await FabulisAPIClient.shared.streamMessage(draftId: draftId, prompt: pending)
         streamTask = Task {
             do {
                 for try await env in stream {
                     if Task.isCancelled { break }
                     switch env.kind {
                     case "chunk":
-                        if env.reasoning != true, let text = env.text {
-                            streamingContent += text
-                        }
-                    case "done":
-                        break
-                    case "error":
-                        errorMessage = env.text ?? "Unknown error"
-                    default:
-                        break
+                        if env.reasoning != true, let text = env.text { streamingContent += text }
+                    case "done": break
+                    case "error": errorMessage = env.text ?? "Unknown error"
+                    default: break
                     }
                 }
             } catch {
@@ -143,33 +172,6 @@ struct DraftView: View {
             draft = try await FabulisAPIClient.shared.getDraft(id: draftId)
         } catch {
             errorMessage = error.localizedDescription
-        }
-    }
-
-    private func regenerate() async {
-        errorMessage = nil
-        streamingContent = ""
-        isStreaming = true
-
-        let stream = await FabulisAPIClient.shared.regenerate(draftId: draftId)
-        streamTask = Task {
-            do {
-                for try await env in stream {
-                    if Task.isCancelled { break }
-                    switch env.kind {
-                    case "chunk":
-                        if env.reasoning != true, let text = env.text { streamingContent += text }
-                    case "done": break
-                    case "error": errorMessage = env.text ?? "Unknown error"
-                    default: break
-                    }
-                }
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
-            streamingContent = ""
-            isStreaming = false
         }
     }
 }
