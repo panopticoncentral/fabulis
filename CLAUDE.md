@@ -53,3 +53,9 @@ the server URL (e.g. `http://your-mac.local:5288`) and the vault password.
 ## Architecture spec
 
 `docs/superpowers/specs/2026-05-02-hybrid-architecture-design.md`
+
+## Deferred work
+
+`BACKLOG.md` at the repo root — single source of truth for items
+deferred from each phase. When something gets shipped, delete its
+entry there.
