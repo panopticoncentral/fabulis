@@ -92,7 +92,7 @@ struct DraftView: View {
         .sheet(isPresented: $showSaveSheet) {
             SaveDraftSheet(draftId: draftId, draftTitle: draft?.title)
         }
-        .sheet(item: $editingMessage) { msg in
+        .fullScreenCover(item: $editingMessage) { msg in
             EditMessageSheet(
                 draftId: draftId,
                 message: msg,

@@ -23,49 +23,65 @@ struct EditMessageSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Content") {
-                    TextEditor(text: $content).frame(minHeight: 160)
-                }
-                if message.role == .prompt {
-                    Section {
-                        Button {
-                            Task { await saveOnly() }
-                        } label: {
-                            Label("Save changes", systemImage: "checkmark")
-                        }
-                        .disabled(!canSave || isSaving)
+            VStack(spacing: 0) {
+                TextEditor(text: $content)
+                    .font(.body)
+                    .padding(8)
+                    .scrollContentBackground(.hidden)
+                    .background(Color(.secondarySystemBackground))
 
+                if message.role == .prompt {
+                    Text("Save & resubmit deletes every message after this prompt and starts a new response from your edited text.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+                }
+
+                Divider().padding(.top, 8)
+
+                HStack(spacing: 12) {
+                    Button("Cancel") { dismiss() }
+                        .buttonStyle(.bordered)
+                        .disabled(isSaving)
+                    Spacer()
+                    if message.role == .prompt {
                         Button {
                             saveAndResubmit()
                         } label: {
-                            Label("Save & resubmit", systemImage: "arrow.clockwise")
+                            Label("Save & Resubmit", systemImage: "arrow.clockwise")
                         }
-                        .disabled(!canSave || isSaving)
-                    } footer: {
-                        Text("Save & resubmit deletes every message after this prompt and starts a new response from your edited text.")
-                    }
-                } else {
-                    Section {
-                        Button {
-                            Task { await saveOnly() }
-                        } label: {
-                            Label("Save changes", systemImage: "checkmark")
-                        }
+                        .buttonStyle(.bordered)
                         .disabled(!canSave || isSaving)
                     }
+                    Button {
+                        Task { await saveOnly() }
+                    } label: {
+                        if isSaving {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSave || isSaving)
                 }
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+                .padding()
             }
             .navigationTitle("Edit \(roleLabel)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            }
+            .interactiveDismissDisabled(isSaving)
             .onAppear { content = message.content }
         }
+        .frame(minWidth: 480, minHeight: 360)
     }
 
     private var canSave: Bool {
