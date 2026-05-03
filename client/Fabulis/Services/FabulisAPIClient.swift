@@ -1,5 +1,24 @@
 import Foundation
 
+private func describeDecoding(_ err: Error) -> String {
+    guard let de = err as? DecodingError else { return err.localizedDescription }
+    func path(_ ctx: DecodingError.Context) -> String {
+        ctx.codingPath.map(\.stringValue).joined(separator: ".")
+    }
+    switch de {
+    case .dataCorrupted(let ctx):
+        return "data corrupted at '\(path(ctx))': \(ctx.debugDescription)"
+    case .keyNotFound(let key, let ctx):
+        return "missing key '\(key.stringValue)' at '\(path(ctx))'"
+    case .typeMismatch(let type, let ctx):
+        return "type mismatch (expected \(type)) at '\(path(ctx))': \(ctx.debugDescription)"
+    case .valueNotFound(let type, let ctx):
+        return "missing value (expected \(type)) at '\(path(ctx))'"
+    @unknown default:
+        return de.localizedDescription
+    }
+}
+
 enum APIError: Error, LocalizedError {
     case notConfigured
     case invalidURL
@@ -14,7 +33,7 @@ enum APIError: Error, LocalizedError {
         case .invalidURL: return "The server URL is malformed."
         case .unauthorized: return "The session is no longer valid."
         case .server(let status, let body): return "Server returned \(status). \(body ?? "")"
-        case .decoding(let err): return "Could not decode response: \(err.localizedDescription)"
+        case .decoding(let err): return "Could not decode response: \(describeDecoding(err))"
         case .transport(let err): return "Network error: \(err.localizedDescription)"
         }
     }
@@ -34,8 +53,24 @@ actor FabulisAPIClient {
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
 
+        // .NET's default System.Text.Json emits ISO 8601 with up to 7-digit
+        // fractional seconds (e.g. "2026-05-02T13:24:45.1234567Z"). Swift's
+        // .iso8601 strategy uses ISO8601DateFormatter without
+        // .withFractionalSeconds, so it rejects those strings. Try both.
+        let withFracs = ISO8601DateFormatter()
+        withFracs.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+
         self.decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { dec in
+            let str = try dec.singleValueContainer().decode(String.self)
+            if let d = withFracs.date(from: str) { return d }
+            if let d = plain.date(from: str) { return d }
+            throw DecodingError.dataCorruptedError(
+                in: try dec.singleValueContainer(),
+                debugDescription: "Unrecognized ISO 8601 date: \(str)")
+        }
 
         self.encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
