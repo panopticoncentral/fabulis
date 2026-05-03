@@ -5,6 +5,7 @@ struct DraftView: View {
 
     @State private var draft: DraftDetail?
     @State private var prompt: String = ""
+    @State private var inFlightPrompt: String?
     @State private var streamingContent: String = ""
     @State private var isStreaming = false
     @State private var streamTask: Task<Void, Never>?
@@ -33,6 +34,11 @@ struct DraftView: View {
                                 }
                                 .id(msg.id)
                             }
+                        }
+                        if let inFlightPrompt {
+                            DraftMessageView(message: DraftMessageDto(
+                                id: -1, role: .prompt, content: inFlightPrompt, sortOrder: Int.max))
+                            .id("inFlightPrompt")
                         }
                         if isStreaming {
                             DraftMessageView(streamingResponse: streamingContent).id("streaming")
@@ -100,6 +106,7 @@ struct DraftView: View {
         prompt = ""
         errorMessage = nil
         streamingContent = ""
+        inFlightPrompt = pending
         isStreaming = true
 
         let stream = await FabulisAPIClient.shared.streamMessage(draftId: draftId, prompt: pending)
@@ -124,6 +131,7 @@ struct DraftView: View {
                 errorMessage = error.localizedDescription
             }
             do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
+            inFlightPrompt = nil
             streamingContent = ""
             isStreaming = false
         }
