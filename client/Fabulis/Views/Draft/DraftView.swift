@@ -155,9 +155,23 @@ struct DraftView: View {
     }
 
     private func editAndResubmit(messageId: Int, content: String) async {
+        // Optimistically reflect the server-side mutation: rewrite the edited
+        // message's content and drop everything after it. The streamed response
+        // arrives via the streaming pane; no separate inFlightPrompt needed
+        // because the user's prompt already lives in draft.messages.
+        if var d = draft, let idx = d.messages.firstIndex(where: { $0.id == messageId }) {
+            let original = d.messages[idx]
+            let edited = DraftMessageDto(
+                id: original.id,
+                role: original.role,
+                content: content,
+                sortOrder: original.sortOrder)
+            d.messages = Array(d.messages.prefix(idx)) + [edited]
+            draft = d
+        }
         let stream = await FabulisAPIClient.shared.editAndResubmit(
             draftId: draftId, messageId: messageId, content: content)
-        runStream(inFlight: content, from: stream)
+        runStream(inFlight: nil, from: stream)
     }
 
     private func regenerate() async {

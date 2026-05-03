@@ -96,7 +96,7 @@ struct DraftDetail: Decodable, Identifiable, Sendable {
     let updatedAt: Date
     let storytellerName: String
     let modelName: String
-    let messages: [DraftMessageDto]
+    var messages: [DraftMessageDto]
 }
 
 struct DraftMessageDto: Decodable, Identifiable, Sendable {
