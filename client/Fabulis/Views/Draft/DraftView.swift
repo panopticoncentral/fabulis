@@ -175,6 +175,10 @@ struct DraftView: View {
     }
 
     private func regenerate() async {
+        if var d = draft, d.messages.last?.role == .response {
+            d.messages.removeLast()
+            draft = d
+        }
         let stream = await FabulisAPIClient.shared.regenerate(draftId: draftId)
         runStream(inFlight: nil, from: stream)
     }
