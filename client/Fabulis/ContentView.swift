@@ -13,6 +13,8 @@ struct ContentView: View {
                 OnboardingView()
             case .needsAuth:
                 UnlockPromptView()
+            case .unreachable(let url, let message):
+                ServerUnreachableView(serverURL: url, message: message)
             case .ready:
                 LibraryView()
             }

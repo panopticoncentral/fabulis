@@ -8,6 +8,7 @@ final class AppState {
         case loading
         case needsOnboarding
         case needsAuth
+        case unreachable(serverURL: String, message: String)
         case ready
     }
 
@@ -17,20 +18,22 @@ final class AppState {
     private let api = FabulisAPIClient.shared
 
     func bootstrap() async {
+        let savedURL = (try? await keychain.loadServerURL()) ?? nil
         do {
-            let serverURL = try await keychain.loadServerURL()
-            guard serverURL != nil, (try await keychain.loadSessionToken()) != nil else {
-                phase = (serverURL == nil) ? .needsOnboarding : .needsAuth
+            guard savedURL != nil, (try await keychain.loadSessionToken()) != nil else {
+                phase = (savedURL == nil) ? .needsOnboarding : .needsAuth
                 return
             }
-            _ = try await api.authStatus()
+            _ = try await api.authStatus(timeout: 5)
             phase = .ready
         } catch APIError.unauthorized {
             phase = .needsAuth
         } catch APIError.notConfigured {
             phase = .needsOnboarding
+        } catch APIError.transport(let err) {
+            phase = .unreachable(serverURL: savedURL ?? "", message: err.localizedDescription)
         } catch {
-            phase = .ready
+            phase = .unreachable(serverURL: savedURL ?? "", message: error.localizedDescription)
         }
     }
 

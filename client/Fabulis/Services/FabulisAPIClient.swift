@@ -103,8 +103,33 @@ actor FabulisAPIClient {
         do { return try decoder.decode(UnlockResponse.self, from: data) } catch { throw APIError.decoding(error) }
     }
 
-    func authStatus() async throws -> AuthStatusResponse {
-        try await request("GET", path: "/auth/status", authed: true)
+    func authStatus(timeout: TimeInterval? = nil) async throws -> AuthStatusResponse {
+        // URLSessionConfiguration.waitsForConnectivity = true makes URLSession
+        // ignore timeoutIntervalForRequest (and per-request timeoutInterval)
+        // while it waits for a route to the host, so a per-request timeout
+        // alone is not enough to fail fast when the server's machine is
+        // asleep. Race the call against Task.sleep so we actually unblock.
+        guard let timeout else {
+            return try await request("GET", path: "/auth/status", authed: true)
+        }
+        return try await withTransportTimeout(seconds: timeout) {
+            try await self.request("GET", path: "/auth/status", authed: true, timeout: timeout)
+        }
+    }
+
+    private func withTransportTimeout<T: Sendable>(
+        seconds: TimeInterval,
+        operation: @Sendable @escaping () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw APIError.transport(URLError(.timedOut))
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
     }
 
     func lock() async throws {
@@ -314,12 +339,13 @@ actor FabulisAPIClient {
         }
     }
 
-    private func request<T: Decodable>(_ method: String, path: String, authed: Bool) async throws -> T {
-        return try await request(method, path: path, body: Optional<EmptyBody>.none, authed: authed)
+    private func request<T: Decodable>(_ method: String, path: String, authed: Bool, timeout: TimeInterval? = nil) async throws -> T {
+        return try await request(method, path: path, body: Optional<EmptyBody>.none, authed: authed, timeout: timeout)
     }
 
-    private func request<T: Decodable, B: Encodable>(_ method: String, path: String, body: B?, authed: Bool) async throws -> T {
-        let req = try await buildRequest(method: method, path: path, body: body, authed: authed)
+    private func request<T: Decodable, B: Encodable>(_ method: String, path: String, body: B?, authed: Bool, timeout: TimeInterval? = nil) async throws -> T {
+        var req = try await buildRequest(method: method, path: path, body: body, authed: authed)
+        if let timeout { req.timeoutInterval = timeout }
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
         do { return try decoder.decode(T.self, from: data) } catch { throw APIError.decoding(error) }
