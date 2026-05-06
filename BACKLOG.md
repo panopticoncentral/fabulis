@@ -33,23 +33,6 @@ and re-subscribe instead of giving up.
 
 Originally deferred in the Phase 3 plan.
 
-### Import / export
-
-Phase 4 deleted the Blazor `/import` and `/export` pages plus their
-filesystem-path-based services (`CategoryImportService`,
-`CategoryExportService`). No native UI replacement exists. Bulk
-operations are currently a "SSH to the server and use sqlite3"
-workflow.
-
-A v2 needs to choose between server-side ZIP download / multipart
-upload OR an iOS-side file picker that drives the API. The current
-markdown format (per-file `Version N [model].md` with `**Me:**` /
-`**StoryTeller:**` delimiters) was designed for direct filesystem
-access — needs revisiting if we go HTTP.
-
-Originally deferred in the Phase 4 plan
-(`docs/superpowers/plans/2026-05-02-phase4-parity-blazor-retirement.md`).
-
 ## Posture / hardening
 
 ### Scoped TLS posture

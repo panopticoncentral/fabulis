@@ -32,6 +32,13 @@ open client/Fabulis.xcodeproj
 Build for an iOS Simulator destination or Mac Catalyst. Onboarding asks for
 the server URL (e.g. `http://your-mac.local:5288`) and the vault password.
 
+Bulk import / export (CLI, runs on the server machine — see
+`src/Fabulis.Cli/README.md`):
+```bash
+dotnet run --project src/Fabulis.Cli -- export <destination>
+dotnet run --project src/Fabulis.Cli -- import <source>
+```
+
 ## Project structure
 
 - `Fabulis.slnx` — solution file
@@ -41,6 +48,8 @@ the server URL (e.g. `http://your-mac.local:5288`) and the vault password.
   - `Auth/` — `SessionTokenStore` + `RequireSession` endpoint filter
   - `Data/` — `FabulisDbContext`, entity types, `DraftService`,
     `OpenRouterService`, `VaultService`, `AutoLockService`
+- `src/Fabulis.Cli/` — bulk import/export CLI; project-references the
+  server for entity types and `FabulisDbContext`
 - `client/Fabulis/`
   - `Models/APIDtos.swift` — Codable mirrors of server DTOs
   - `Services/` — `KeychainService` (serverURL + sessionToken),
