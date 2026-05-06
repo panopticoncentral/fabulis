@@ -20,6 +20,10 @@ struct UnlockPromptView: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
                     .padding(.horizontal)
+                    .onSubmit {
+                        guard !password.isEmpty, !isSubmitting else { return }
+                        Task { await submit() }
+                    }
                 if let errorMessage {
                     Text(errorMessage).font(.caption).foregroundStyle(.red)
                 }
