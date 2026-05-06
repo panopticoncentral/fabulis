@@ -12,68 +12,53 @@ struct DraftView: View {
     @State private var errorMessage: String?
     @State private var showSaveSheet = false
     @State private var editingMessage: DraftMessageDto?
-    /// Auto-scrolls the message list as new chunks arrive. Pauses when the user
-    /// scrolls away from the bottom; resumes when they scroll back.
-    @State private var autoScroll = true
+    /// Starts unset. `loadDraft` flips it to the .bottom edge once messages
+    /// arrive — initializing with .bottom directly is a no-op (the ScrollView
+    /// applies it against empty content, then sees no binding change when the
+    /// data lands). Subsequent user scrolls turn it into a fixed point so
+    /// streaming chunks don't drag them back; scrolling near the bottom
+    /// re-snaps to the .bottom edge so rotation re-anchors there.
+    @State private var scrollPosition = ScrollPosition()
     @FocusState private var promptFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        if let draft {
-                            ForEach(Array(draft.messages.enumerated()), id: \.element.id) { idx, msg in
-                                let isLast = idx == draft.messages.count - 1
-                                let isLastResponse = isLast && msg.role == .response
-                                DraftMessageView(message: msg) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if let draft {
+                        ForEach(Array(draft.messages.enumerated()), id: \.element.id) { idx, msg in
+                            let isLast = idx == draft.messages.count - 1
+                            let isLastResponse = isLast && msg.role == .response
+                            DraftMessageView(message: msg) {
+                                Button {
+                                    editingMessage = msg
+                                } label: { Label("Edit", systemImage: "pencil") }
+                                if isLastResponse {
                                     Button {
-                                        editingMessage = msg
-                                    } label: { Label("Edit", systemImage: "pencil") }
-                                    if isLastResponse {
-                                        Button {
-                                            Task { await regenerate() }
-                                        } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
-                                    }
-                                    Divider()
-                                    Button(role: .destructive) {
-                                        Task { await deleteMessage(msg.id) }
-                                    } label: { Label("Delete and after", systemImage: "trash") }
+                                        Task { await regenerate() }
+                                    } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
                                 }
-                                .id(msg.id)
+                                Divider()
+                                Button(role: .destructive) {
+                                    Task { await deleteMessage(msg.id) }
+                                } label: { Label("Delete and after", systemImage: "trash") }
                             }
                         }
-                        if let inFlightPrompt {
-                            DraftMessageView(message: DraftMessageDto(
-                                id: -1, role: .prompt, content: inFlightPrompt, sortOrder: Int.max))
-                            .id("inFlightPrompt")
-                        }
-                        if isStreaming {
-                            DraftMessageView(streamingResponse: streamingContent).id("streaming")
-                        }
-                        if let errorMessage {
-                            Text(errorMessage).foregroundStyle(.red).padding(.top, 8)
-                        }
                     }
-                    .padding()
-                }
-                .onScrollGeometryChange(for: Bool.self) { geometry in
-                    let bottomEdge = geometry.contentOffset.y + geometry.containerSize.height
-                    return geometry.contentSize.height - bottomEdge < 60
-                } action: { _, isAtBottom in
-                    autoScroll = isAtBottom
-                }
-                .onChange(of: streamingContent) {
-                    if autoScroll {
-                        withAnimation { proxy.scrollTo("streaming", anchor: .bottom) }
+                    if let inFlightPrompt {
+                        DraftMessageView(message: DraftMessageDto(
+                            id: -1, role: .prompt, content: inFlightPrompt, sortOrder: Int.max))
+                    }
+                    if isStreaming {
+                        DraftMessageView(streamingResponse: streamingContent)
+                    }
+                    if let errorMessage {
+                        Text(errorMessage).foregroundStyle(.red).padding(.top, 8)
                     }
                 }
-                .onChange(of: draft?.messages.count ?? 0) {
-                    if autoScroll, let last = draft?.messages.last {
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                    }
-                }
+                .padding()
             }
+            .scrollPosition($scrollPosition, anchor: .bottom)
 
             Divider()
             inputBar
@@ -135,6 +120,12 @@ struct DraftView: View {
     private func loadDraft() async {
         do {
             draft = try await FabulisAPIClient.shared.getDraft(id: draftId)
+            // Pin to the bottom edge. The ScrollView already laid out at
+            // offset 0 against the (then-empty) content, so we have to push
+            // it explicitly here — and we couldn't initialize at .bottom
+            // because that would already match this assignment, leaving the
+            // binding unchanged and the scroll un-applied.
+            scrollPosition.scrollTo(edge: .bottom)
             promptFocused = true
         } catch {
             errorMessage = error.localizedDescription
@@ -188,7 +179,6 @@ struct DraftView: View {
         streamingContent = ""
         inFlightPrompt = inFlight
         isStreaming = true
-        autoScroll = true
 
         streamTask = Task {
             do {
