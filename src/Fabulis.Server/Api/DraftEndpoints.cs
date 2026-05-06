@@ -39,8 +39,10 @@ public static class DraftEndpoints
             return draft is null ? Results.NotFound() : Results.Ok(ToDto(draft));
         });
 
-        group.MapDelete("/{id:int}", async (int id, DraftService drafts) =>
+        group.MapDelete("/{id:int}", async (int id, DraftService drafts, GenerationManager gens) =>
         {
+            gens.Get(id)?.Cts.Cancel();
+            gens.Remove(id);
             await drafts.DeleteDraftAsync(id);
             return Results.NoContent();
         });
@@ -49,7 +51,7 @@ public static class DraftEndpoints
             int id,
             StreamPromptRequest body,
             DraftService drafts,
-            OpenRouterService openRouter,
+            GenerationManager gens,
             HttpContext http,
             CancellationToken ct) =>
         {
@@ -59,58 +61,13 @@ public static class DraftEndpoints
             var draft = await drafts.GetDraftAsync(id);
             if (draft is null) return Results.NotFound();
 
+            if (gens.IsRunning(id))
+                return Results.Conflict(new { error = "a generation is already in progress" });
+
             await drafts.AddMessageAsync(id, MessageRole.Prompt, body.Prompt.Trim());
-            draft = await drafts.GetDraftAsync(id);
-            if (draft is null) return Results.NotFound();
+            var gen = gens.Start(id);
 
-            http.Response.ContentType = "text/event-stream";
-            http.Response.Headers.CacheControl = "no-cache";
-            http.Response.Headers["X-Accel-Buffering"] = "no";
-
-            var content = new StringBuilder();
-            var storyteller = draft.Storyteller;
-
-            try
-            {
-                await foreach (var chunk in openRouter.ChatStreamAsync(
-                    storyteller.ModelName,
-                    storyteller.Prompt,
-                    draft.Messages.ToList(),
-                    storyteller.Temperature,
-                    storyteller.TopP,
-                    storyteller.MaxTokens,
-                    storyteller.MinP,
-                    storyteller.TopK,
-                    storyteller.TopA,
-                    ct))
-                {
-                    var isReasoning = chunk.Kind == StreamChunkKind.Reasoning;
-                    if (!isReasoning) content.Append(chunk.Text);
-                    await WriteEnvelope(http, new StreamEnvelope("chunk", chunk.Text, isReasoning, null), ct);
-                }
-
-                int? savedId = null;
-                if (content.Length > 0)
-                {
-                    var saved = await drafts.AddMessageAsync(id, MessageRole.Response, content.ToString());
-                    savedId = saved.Id;
-                }
-                await WriteEnvelope(http, new StreamEnvelope("done", null, null, savedId), ct);
-            }
-            catch (OperationCanceledException)
-            {
-                if (content.Length > 0)
-                {
-                    var saved = await drafts.AddMessageAsync(id, MessageRole.Response, content.ToString());
-                    await WriteEnvelope(http, new StreamEnvelope("done", null, null, saved.Id), CancellationToken.None);
-                }
-            }
-            catch (Exception ex)
-            {
-                await WriteEnvelope(http, new StreamEnvelope("error", ex.Message, null, null), CancellationToken.None);
-            }
-
-            return Results.Empty;
+            return await StreamGeneration(http, gen, ct);
         });
 
         group.MapPost("/{id:int}/save", async (
@@ -173,7 +130,7 @@ public static class DraftEndpoints
             int messageId,
             UpdateMessageRequest body,
             DraftService drafts,
-            OpenRouterService openRouter,
+            GenerationManager gens,
             HttpContext http,
             CancellationToken ct) =>
         {
@@ -183,110 +140,65 @@ public static class DraftEndpoints
             var initial = await drafts.GetDraftAsync(draftId);
             if (initial is null) return Results.NotFound();
 
+            if (gens.IsRunning(draftId))
+                return Results.Conflict(new { error = "a generation is already in progress" });
+
             await drafts.UpdateMessageAndDeleteSubsequentAsync(messageId, body.Content);
             var draft = await drafts.GetDraftAsync(draftId);
             if (draft is null || draft.Messages.Count == 0)
                 return Results.BadRequest(new { error = "no messages to stream from" });
 
-            http.Response.ContentType = "text/event-stream";
-            http.Response.Headers.CacheControl = "no-cache";
-            http.Response.Headers["X-Accel-Buffering"] = "no";
-
-            var content = new StringBuilder();
-            var storyteller = draft.Storyteller;
-
-            try
-            {
-                await foreach (var chunk in openRouter.ChatStreamAsync(
-                    storyteller.ModelName, storyteller.Prompt, draft.Messages.ToList(),
-                    storyteller.Temperature, storyteller.TopP, storyteller.MaxTokens,
-                    storyteller.MinP, storyteller.TopK, storyteller.TopA, ct))
-                {
-                    var isReasoning = chunk.Kind == StreamChunkKind.Reasoning;
-                    if (!isReasoning) content.Append(chunk.Text);
-                    await WriteEnvelope(http, new StreamEnvelope("chunk", chunk.Text, isReasoning, null), ct);
-                }
-
-                int? savedId = null;
-                if (content.Length > 0)
-                {
-                    var saved = await drafts.AddMessageAsync(draftId, MessageRole.Response, content.ToString());
-                    savedId = saved.Id;
-                }
-                await WriteEnvelope(http, new StreamEnvelope("done", null, null, savedId), ct);
-            }
-            catch (OperationCanceledException)
-            {
-                if (content.Length > 0)
-                {
-                    var saved = await drafts.AddMessageAsync(draftId, MessageRole.Response, content.ToString());
-                    await WriteEnvelope(http, new StreamEnvelope("done", null, null, saved.Id), CancellationToken.None);
-                }
-            }
-            catch (Exception ex)
-            {
-                await WriteEnvelope(http, new StreamEnvelope("error", ex.Message, null, null), CancellationToken.None);
-            }
-
-            return Results.Empty;
+            var gen = gens.Start(draftId);
+            return await StreamGeneration(http, gen, ct);
         });
 
         group.MapPost("/{id:int}/regenerate", async (
             int id,
             DraftService drafts,
-            OpenRouterService openRouter,
+            GenerationManager gens,
             HttpContext http,
             CancellationToken ct) =>
         {
             var initial = await drafts.GetDraftAsync(id);
             if (initial is null) return Results.NotFound();
 
+            if (gens.IsRunning(id))
+                return Results.Conflict(new { error = "a generation is already in progress" });
+
             await drafts.DeleteLastResponseAsync(id);
             var draft = await drafts.GetDraftAsync(id);
             if (draft is null || draft.Messages.Count == 0)
                 return Results.BadRequest(new { error = "no messages to regenerate from" });
 
-            http.Response.ContentType = "text/event-stream";
-            http.Response.Headers.CacheControl = "no-cache";
-            http.Response.Headers["X-Accel-Buffering"] = "no";
+            var gen = gens.Start(id);
+            return await StreamGeneration(http, gen, ct);
+        });
 
-            var content = new StringBuilder();
-            var storyteller = draft.Storyteller;
+        // Re-attach to an in-flight (or recently-completed) generation for
+        // this draft. Used by the client to resume after a network drop —
+        // e.g. the iPhone backgrounded the app mid-stream and URLSession
+        // dropped the connection, but the generation kept running on the
+        // server. The first envelope is `snapshot` (full content so far);
+        // the stream then continues with deltas, or terminates immediately
+        // if the generation has already finished. 404 means there's nothing
+        // in flight — caller should refresh the draft.
+        group.MapGet("/{id:int}/stream", async (
+            int id,
+            GenerationManager gens,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var gen = gens.Get(id);
+            if (gen is null) return Results.NotFound();
+            return await StreamGeneration(http, gen, ct);
+        });
 
-            try
-            {
-                await foreach (var chunk in openRouter.ChatStreamAsync(
-                    storyteller.ModelName, storyteller.Prompt, draft.Messages.ToList(),
-                    storyteller.Temperature, storyteller.TopP, storyteller.MaxTokens,
-                    storyteller.MinP, storyteller.TopK, storyteller.TopA, ct))
-                {
-                    var isReasoning = chunk.Kind == StreamChunkKind.Reasoning;
-                    if (!isReasoning) content.Append(chunk.Text);
-                    await WriteEnvelope(http, new StreamEnvelope("chunk", chunk.Text, isReasoning, null), ct);
-                }
-
-                int? savedId = null;
-                if (content.Length > 0)
-                {
-                    var saved = await drafts.AddMessageAsync(id, MessageRole.Response, content.ToString());
-                    savedId = saved.Id;
-                }
-                await WriteEnvelope(http, new StreamEnvelope("done", null, null, savedId), ct);
-            }
-            catch (OperationCanceledException)
-            {
-                if (content.Length > 0)
-                {
-                    var saved = await drafts.AddMessageAsync(id, MessageRole.Response, content.ToString());
-                    await WriteEnvelope(http, new StreamEnvelope("done", null, null, saved.Id), CancellationToken.None);
-                }
-            }
-            catch (Exception ex)
-            {
-                await WriteEnvelope(http, new StreamEnvelope("error", ex.Message, null, null), CancellationToken.None);
-            }
-
-            return Results.Empty;
+        // Explicit cancel: stop generating and save whatever was produced
+        // so far. Returns 204 even if there's nothing in flight (idempotent).
+        group.MapDelete("/{id:int}/stream", (int id, GenerationManager gens) =>
+        {
+            gens.Get(id)?.Cts.Cancel();
+            return Results.NoContent();
         });
 
         return routes;
@@ -298,6 +210,28 @@ public static class DraftEndpoints
         d.Messages.OrderBy(m => m.SortOrder)
             .Select(m => new DraftMessageDto(m.Id, m.Role, m.Content, m.SortOrder))
             .ToList());
+
+    private static async Task<IResult> StreamGeneration(HttpContext http, Generation gen, CancellationToken ct)
+    {
+        http.Response.ContentType = "text/event-stream";
+        http.Response.Headers.CacheControl = "no-cache";
+        http.Response.Headers["X-Accel-Buffering"] = "no";
+
+        try
+        {
+            await foreach (var env in gen.SubscribeAsync(ct))
+            {
+                await WriteEnvelope(http, env, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Client disconnected (e.g. backgrounded). The generation keeps
+            // running; another request can re-attach via GET /stream.
+        }
+
+        return Results.Empty;
+    }
 
     private static async Task WriteEnvelope(HttpContext http, StreamEnvelope env, CancellationToken ct)
     {

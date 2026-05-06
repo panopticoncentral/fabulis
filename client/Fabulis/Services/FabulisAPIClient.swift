@@ -297,6 +297,55 @@ actor FabulisAPIClient {
         try await requestVoid("PUT", path: "/storyteller", body: body, authed: true)
     }
 
+    /// Re-attaches to an in-flight (or recently-completed) generation for
+    /// `draftId`. The first envelope is `snapshot` (full content so far),
+    /// followed by live deltas, and a terminal `done`/`error` envelope.
+    /// Throws `APIError.server(status: 404, …)` if there's nothing to attach
+    /// to — caller should refresh the draft via `getDraft`.
+    func streamReattach(draftId: Int) -> AsyncThrowingStream<StreamEnvelope, Error> {
+        let session = self.session
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let req = try await self.buildRequest(method: "GET", path: "/drafts/\(draftId)/stream", authed: true)
+                    let (bytes, response) = try await session.bytes(for: req)
+                    if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+                        continuation.finish(throwing: APIError.unauthorized); return
+                    }
+                    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                        continuation.finish(throwing: APIError.server(status: http.statusCode, body: nil)); return
+                    }
+                    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+                    for try await line in bytes.lines {
+                        try Task.checkCancellation()
+                        guard line.hasPrefix("data: ") else { continue }
+                        let payload = String(line.dropFirst("data: ".count))
+                        if let data = payload.data(using: .utf8) {
+                            do {
+                                let env = try dec.decode(StreamEnvelope.self, from: data)
+                                continuation.yield(env)
+                                if env.kind == "done" || env.kind == "error" { break }
+                            } catch { /* skip malformed */ }
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Tells the server to stop the in-flight generation for `draftId` and
+    /// save whatever has been produced so far. Idempotent: returns 204 even
+    /// if nothing is in flight.
+    func abortStream(draftId: Int) async throws {
+        try await requestVoid("DELETE", path: "/drafts/\(draftId)/stream", authed: true)
+    }
+
     /// Streams `StreamEnvelope` events from POST /drafts/{id}/messages.
     /// Caller stops by cancelling the consuming Task.
     func streamMessage(draftId: Int, prompt: String) -> AsyncThrowingStream<StreamEnvelope, Error> {
@@ -361,6 +410,10 @@ actor FabulisAPIClient {
         let req = try await buildRequest(method: method, path: path, body: body, authed: authed)
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
+    }
+
+    private func buildRequest(method: String, path: String, authed: Bool) async throws -> URLRequest {
+        try await buildRequest(method: method, path: path, body: Optional<EmptyBody>.none, authed: authed)
     }
 
     private func buildRequest<B: Encodable>(method: String, path: String, body: B?, authed: Bool) async throws -> URLRequest {

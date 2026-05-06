@@ -22,6 +22,7 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<OpenRouterService>();
 builder.Services.AddScoped<DraftService>();
+builder.Services.AddSingleton<GenerationManager>();
 
 var app = builder.Build();
 

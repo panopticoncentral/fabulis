@@ -9,6 +9,8 @@ public class VaultService(SessionTokenStore tokens)
     private int _isUnlocked;
     private string? _password;
 
+    public event Action? Locked;
+
     public bool IsUnlocked => Volatile.Read(ref _isUnlocked) != 0;
 
     public string? Password => Volatile.Read(ref _password);
@@ -38,6 +40,7 @@ public class VaultService(SessionTokenStore tokens)
         Volatile.Write(ref _isUnlocked, 0);
         Volatile.Write(ref _autoLockMinutes, 0);
         tokens.RevokeAll();
+        Locked?.Invoke();
     }
 
     public void RecordActivity()

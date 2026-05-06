@@ -102,6 +102,12 @@ struct DraftView: View {
                 }
             Button {
                 if isStreaming {
+                    // Generation runs server-side independent of the HTTP
+                    // request, so cancelling the local Task alone won't stop
+                    // it. Tell the server to abort, then drop the stream
+                    // locally — the server's "done" envelope (with the
+                    // partial response saved) may not reach us once we cancel.
+                    Task { try? await FabulisAPIClient.shared.abortStream(draftId: draftId) }
                     streamTask?.cancel()
                 } else {
                     Task { await submit() }
@@ -142,7 +148,7 @@ struct DraftView: View {
         guard !pending.isEmpty else { return }
         prompt = ""
         let stream = await FabulisAPIClient.shared.streamMessage(draftId: draftId, prompt: pending)
-        runStream(inFlight: pending, from: stream)
+        runStream(inFlight: pending, initial: stream)
     }
 
     private func editAndResubmit(messageId: Int, content: String) async {
@@ -162,7 +168,7 @@ struct DraftView: View {
         }
         let stream = await FabulisAPIClient.shared.editAndResubmit(
             draftId: draftId, messageId: messageId, content: content)
-        runStream(inFlight: nil, from: stream)
+        runStream(inFlight: nil, initial: stream)
     }
 
     private func regenerate() async {
@@ -171,32 +177,84 @@ struct DraftView: View {
             draft = d
         }
         let stream = await FabulisAPIClient.shared.regenerate(draftId: draftId)
-        runStream(inFlight: nil, from: stream)
+        runStream(inFlight: nil, initial: stream)
     }
 
-    private func runStream(inFlight: String?, from stream: AsyncThrowingStream<StreamEnvelope, Error>) {
+    /// Drives the streaming UI. The server-side generation is decoupled from
+    /// the HTTP request, so a dropped connection (phone locked, app
+    /// backgrounded) is recoverable: we re-attach via `streamReattach` which
+    /// replays a `snapshot` of the content so far and continues with deltas.
+    /// We exit on `done`/`error` envelopes from the server, on user Stop, or
+    /// when reattach reports 404 (no in-flight generation — fall through to
+    /// refreshing the draft and showing whatever the server saved).
+    private func runStream(inFlight: String?, initial: AsyncThrowingStream<StreamEnvelope, Error>?) {
         errorMessage = nil
         streamingContent = ""
         inFlightPrompt = inFlight
         isStreaming = true
 
         streamTask = Task {
-            do {
-                for try await env in stream {
-                    if Task.isCancelled { break }
-                    switch env.kind {
-                    case "chunk":
-                        if env.reasoning != true, let text = env.text { streamingContent += text }
-                    case "done": break
-                    case "error": errorMessage = env.text ?? "Unknown error"
-                    default: break
-                    }
+            var current = initial
+            var done = false
+            var stoppedByUser = false
+            // Bound the retry loop so a downed server can't trap us forever.
+            // Reset to 0 every time we successfully receive an envelope.
+            var consecutiveFailures = 0
+            let maxFailures = 5
+
+            while !done {
+                if Task.isCancelled { stoppedByUser = true; break }
+
+                if current == nil {
+                    // streamReattach returns the stream synchronously (no
+                    // throw) — errors surface on iteration below.
+                    current = await FabulisAPIClient.shared.streamReattach(draftId: draftId)
                 }
-            } catch is CancellationError {
-                // User tapped Stop — partial response is persisted server-side.
-            } catch {
-                errorMessage = error.localizedDescription
+
+                do {
+                    for try await env in current! {
+                        if Task.isCancelled { stoppedByUser = true; break }
+                        consecutiveFailures = 0
+                        switch env.kind {
+                        case "snapshot":
+                            streamingContent = env.text ?? ""
+                        case "chunk":
+                            if env.reasoning != true, let text = env.text {
+                                streamingContent += text
+                            }
+                        case "done":
+                            done = true
+                        case "error":
+                            errorMessage = env.text ?? "Unknown error"
+                            done = true
+                        default: break
+                        }
+                    }
+                    if !done && !stoppedByUser {
+                        // Stream ended without a terminal envelope (network
+                        // drop). Loop back to reattach.
+                        current = nil
+                    }
+                } catch is CancellationError {
+                    stoppedByUser = true
+                } catch APIError.server(let status, _) where status == 404 {
+                    // Nothing in flight server-side. Generation finished
+                    // before we reattached — getDraft will pick up whatever
+                    // was saved.
+                    break
+                } catch {
+                    if Task.isCancelled { stoppedByUser = true; break }
+                    consecutiveFailures += 1
+                    if consecutiveFailures >= maxFailures {
+                        errorMessage = error.localizedDescription
+                        break
+                    }
+                    // Transient network failure. Brief backoff, then reattach.
+                    try? await Task.sleep(for: .seconds(1))
+                    current = nil
+                }
             }
+
             do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
             inFlightPrompt = nil
             streamingContent = ""
