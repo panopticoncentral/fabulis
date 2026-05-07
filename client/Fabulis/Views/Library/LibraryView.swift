@@ -82,6 +82,20 @@ struct LibraryView: View {
                                         .font(.caption2).foregroundStyle(.secondary)
                                 }
                             }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    Task { await deleteDraft(draft) }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await deleteDraft(draft) }
+                                } label: {
+                                    Label("Delete Draft", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -121,6 +135,16 @@ struct LibraryView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func deleteDraft(_ draft: DraftSummary) async {
+        drafts.removeAll { $0.id == draft.id }
+        do {
+            try await FabulisAPIClient.shared.deleteDraft(id: draft.id)
+        } catch {
+            errorMessage = error.localizedDescription
+            await load()
+        }
     }
 
     private func createDraft() async {
