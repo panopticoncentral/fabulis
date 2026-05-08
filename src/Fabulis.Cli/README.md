@@ -14,9 +14,21 @@ dotnet run --project src/Fabulis.Cli -- import <source>
 Both commands prompt for the vault password (no echo).
 
 - `export` writes a directory tree at `<destination>`, which must not exist.
-- `import` reads a directory tree from `<source>`. Each immediate
-  subdirectory is treated as a category. An optional `_drafts/` directory
-  alongside the categories is read back into the `Drafts` table.
+- `import` reads a directory tree from `<source>`. The CLI auto-detects
+  whether `<source>` is:
+  - a **library root** — each immediate subdirectory is treated as a
+    category, and an optional `_drafts/` directory alongside the
+    categories is read back into the `Drafts` table; or
+  - a **single category** — the immediate subdirectories are treated as
+    stories and the category name is the basename of `<source>`. Drafts
+    are not read in this mode.
+
+  Detection rule, applied in order: a `_drafts/` child means library
+  root; otherwise, if any immediate subdirectory contains
+  `Version N [<Model>].md` files directly, the source is treated as a
+  single category; otherwise, if any grand-subdirectory contains those
+  files, the source is treated as a library root. If none of these
+  match, import errors out.
 
 Import is idempotent:
 - existing category / story / version rows are reused; matching

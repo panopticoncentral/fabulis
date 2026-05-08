@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Fabulis.Server.Data;
@@ -25,20 +26,76 @@ public partial class CategoryImportService
         if (!root.Exists)
             throw new DirectoryNotFoundException($"Directory not found: {rootPath}");
 
-        foreach (var subDir in root.GetDirectories().OrderBy(d => d.Name))
+        var shape = DetectImportShape(root);
+        switch (shape)
         {
-            if (string.Equals(subDir.Name, "_drafts", StringComparison.OrdinalIgnoreCase))
-                continue;
+            case ImportShape.LibraryRoot:
+                foreach (var subDir in root.GetDirectories().OrderBy(d => d.Name))
+                {
+                    if (string.Equals(subDir.Name, "_drafts", StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-            await ImportCategoryAsync(db, subDir, result);
+                    await ImportCategoryAsync(db, subDir, result);
+                }
+
+                var draftsDir = root.GetDirectories("_drafts").FirstOrDefault();
+                if (draftsDir is not null)
+                    await ImportDraftsAsync(db, draftsDir, result);
+                break;
+
+            case ImportShape.SingleCategory:
+                await ImportCategoryAsync(db, root, result);
+                break;
+
+            case ImportShape.Unknown:
+                throw new InvalidOperationException(
+                    $"Could not determine whether '{rootPath}' is a library root or a single category. " +
+                    "Expected either category subdirectories or story subdirectories containing " +
+                    "'Version N [<Model>].md' files.");
+
+            default:
+                throw new UnreachableException($"Unhandled ImportShape: {shape}");
         }
-
-        var draftsDir = root.GetDirectories("_drafts").FirstOrDefault();
-        if (draftsDir is not null)
-            await ImportDraftsAsync(db, draftsDir, result);
 
         await db.SaveChangesAsync();
         return result;
+    }
+
+    private static ImportShape DetectImportShape(DirectoryInfo root)
+    {
+        var children = root.GetDirectories();
+
+        // Rule 1: a _drafts/ child is conclusive evidence of a library root.
+        if (children.Any(d => string.Equals(d.Name, "_drafts", StringComparison.OrdinalIgnoreCase)))
+            return ImportShape.LibraryRoot;
+
+        var versionRegex = VersionFileNamePattern();
+
+        // Rule 2: any child directly contains a version file -> single category.
+        foreach (var child in children)
+        {
+            if (child.GetFiles("*.md").Any(f => versionRegex.IsMatch(f.Name)))
+                return ImportShape.SingleCategory;
+        }
+
+        // Rule 3: any grandchild contains a version file (and no child did) -> library root.
+        foreach (var child in children)
+        {
+            foreach (var grandchild in child.GetDirectories())
+            {
+                if (grandchild.GetFiles("*.md").Any(f => versionRegex.IsMatch(f.Name)))
+                    return ImportShape.LibraryRoot;
+            }
+        }
+
+        return ImportShape.Unknown;
+    }
+
+    private enum ImportShape
+    {
+        LibraryRoot,
+        SingleCategory,
+        Unknown
     }
 
     private async Task ImportCategoryAsync(FabulisDbContext db, DirectoryInfo categoryDir, ImportResult result)
@@ -56,7 +113,9 @@ public partial class CategoryImportService
             result.CategoriesCreated++;
         }
 
-        foreach (var storyDir in categoryDir.GetDirectories().OrderBy(d => d.Name))
+        foreach (var storyDir in categoryDir.GetDirectories()
+            .Where(d => !string.Equals(d.Name, "_drafts", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(d => d.Name))
         {
             var story = category.Stories.FirstOrDefault(s => s.Title == storyDir.Name);
             if (story is null)
