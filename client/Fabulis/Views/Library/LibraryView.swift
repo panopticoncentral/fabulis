@@ -1,17 +1,23 @@
 import SwiftUI
 
+enum LibrarySelection: Hashable {
+    case draft(id: Int)
+    case category(id: Int, name: String)
+}
+
 struct LibraryView: View {
     @State private var categories: [CategorySummary] = []
     @State private var drafts: [DraftSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var creatingDraft = false
-    @State private var pendingNewDraftId: Int?
+    @State private var selection: LibrarySelection?
     @State private var showingNewCategorySheet = false
+    @State private var showingSettingsSheet = false
 
     var body: some View {
-        NavigationStack {
-            content
+        NavigationSplitView {
+            sidebar
                 .navigationTitle("Library")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -30,7 +36,7 @@ struct LibraryView: View {
                         Button { showingNewCategorySheet = true } label: {
                             Image(systemName: "folder.badge.plus")
                         }
-                        NavigationLink(destination: SettingsView()) {
+                        Button { showingSettingsSheet = true } label: {
                             Image(systemName: "gear")
                         }
                     }
@@ -40,27 +46,18 @@ struct LibraryView: View {
                         Task { await load() }
                     })
                 }
-                .navigationDestination(for: CategorySummary.self) { category in
-                    CategoryView(categoryId: category.id, categoryName: category.name)
-                }
-                .navigationDestination(for: DraftSummary.self) { draft in
-                    DraftView(draftId: draft.id)
-                }
-                .navigationDestination(isPresented: Binding(
-                    get: { pendingNewDraftId != nil },
-                    set: { if !$0 { pendingNewDraftId = nil } }
-                )) {
-                    if let id = pendingNewDraftId {
-                        DraftView(draftId: id)
-                    }
+                .sheet(isPresented: $showingSettingsSheet) {
+                    NavigationStack { SettingsView() }
                 }
                 .task { await load() }
                 .refreshable { await load() }
+        } detail: {
+            detail
         }
     }
 
     @ViewBuilder
-    private var content: some View {
+    private var sidebar: some View {
         if isLoading && categories.isEmpty && drafts.isEmpty {
             ProgressView()
         } else if let errorMessage {
@@ -71,17 +68,16 @@ struct LibraryView: View {
             }
             .padding()
         } else {
-            List {
+            List(selection: $selection) {
                 if !drafts.isEmpty {
                     Section("Drafts") {
                         ForEach(drafts) { draft in
-                            NavigationLink(value: draft) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(draft.title ?? "Untitled draft").font(.body)
-                                    Text("\(draft.messageCount) message\(draft.messageCount == 1 ? "" : "s") · \(draft.updatedAt.formatted(date: .abbreviated, time: .shortened))")
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(draft.title ?? "Untitled draft").font(.body)
+                                Text("\(draft.messageCount) message\(draft.messageCount == 1 ? "" : "s") · \(draft.updatedAt.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.caption2).foregroundStyle(.secondary)
                             }
+                            .tag(LibrarySelection.draft(id: draft.id))
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
                                     Task { await deleteDraft(draft) }
@@ -108,17 +104,36 @@ struct LibraryView: View {
                 } else {
                     Section("Library") {
                         ForEach(categories) { category in
-                            NavigationLink(value: category) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(category.name).font(.body)
-                                    Text("\(category.storyCount) \(category.storyCount == 1 ? "story" : "stories")")
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(category.name).font(.body)
+                                Text("\(category.storyCount) \(category.storyCount == 1 ? "story" : "stories")")
+                                    .font(.caption2).foregroundStyle(.secondary)
                             }
+                            .tag(LibrarySelection.category(id: category.id, name: category.name))
                         }
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        switch selection {
+        case .draft(let id):
+            NavigationStack { DraftView(draftId: id).id(id) }
+        case .category(let id, let name):
+            NavigationStack {
+                CategoryView(categoryId: id, categoryName: name, onDeleted: {
+                    selection = nil
+                    Task { await load() }
+                })
+                .id(id)
+            }
+        case .none:
+            ContentUnavailableView("Select a draft or category",
+                systemImage: "books.vertical",
+                description: Text("Pick a draft to keep working, or open a category to read its stories."))
         }
     }
 
@@ -138,6 +153,9 @@ struct LibraryView: View {
     }
 
     private func deleteDraft(_ draft: DraftSummary) async {
+        if case .draft(let id) = selection, id == draft.id {
+            selection = nil
+        }
         drafts.removeAll { $0.id == draft.id }
         do {
             try await FabulisAPIClient.shared.deleteDraft(id: draft.id)
@@ -152,7 +170,8 @@ struct LibraryView: View {
         defer { creatingDraft = false }
         do {
             let draft = try await FabulisAPIClient.shared.createDraft()
-            pendingNewDraftId = draft.id
+            await load()
+            selection = .draft(id: draft.id)
         } catch {
             errorMessage = error.localizedDescription
         }

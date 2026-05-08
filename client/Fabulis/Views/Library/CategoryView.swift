@@ -3,6 +3,7 @@ import SwiftUI
 struct CategoryView: View {
     let categoryId: Int
     let categoryName: String
+    var onDeleted: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var detail: CategoryDetail?
@@ -87,7 +88,11 @@ struct CategoryView: View {
         deleting = true; defer { deleting = false }
         do {
             try await FabulisAPIClient.shared.deleteCategory(id: categoryId)
-            dismiss()
+            if let onDeleted {
+                onDeleted()
+            } else {
+                dismiss()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
