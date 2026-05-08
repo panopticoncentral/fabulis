@@ -14,6 +14,7 @@ struct LibraryView: View {
     @State private var selection: LibrarySelection?
     @State private var showingNewCategorySheet = false
     @State private var showingSettingsSheet = false
+    @State private var categoryPendingDeletion: CategorySummary?
 
     var body: some View {
         NavigationSplitView {
@@ -49,6 +50,20 @@ struct LibraryView: View {
                 .sheet(isPresented: $showingSettingsSheet) {
                     NavigationStack { SettingsView() }
                 }
+                .alert("Delete category?",
+                       isPresented: Binding(
+                            get: { categoryPendingDeletion != nil },
+                            set: { if !$0 { categoryPendingDeletion = nil } }),
+                       presenting: categoryPendingDeletion,
+                       actions: { category in
+                            Button("Cancel", role: .cancel) {}
+                            Button("Delete", role: .destructive) {
+                                Task { await deleteCategory(category) }
+                            }
+                       },
+                       message: { _ in
+                            Text("This deletes the category and all its stories. This cannot be undone.")
+                       })
                 .task { await load() }
                 .refreshable { await load() }
         } detail: {
@@ -110,6 +125,20 @@ struct LibraryView: View {
                                     .font(.caption2).foregroundStyle(.secondary)
                             }
                             .tag(LibrarySelection.category(id: category.id, name: category.name))
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    categoryPendingDeletion = category
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    categoryPendingDeletion = category
+                                } label: {
+                                    Label("Delete Category", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -150,6 +179,19 @@ struct LibraryView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func deleteCategory(_ category: CategorySummary) async {
+        if case .category(let id, _) = selection, id == category.id {
+            selection = nil
+        }
+        categories.removeAll { $0.id == category.id }
+        do {
+            try await FabulisAPIClient.shared.deleteCategory(id: category.id)
+        } catch {
+            errorMessage = error.localizedDescription
+            await load()
+        }
     }
 
     private func deleteDraft(_ draft: DraftSummary) async {
