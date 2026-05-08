@@ -1,17 +1,18 @@
 import SwiftUI
 
 enum LibrarySelection: Hashable {
-    case draft(id: Int)
+    case draftsRoot
     case category(id: Int, name: String)
 }
 
 struct LibraryView: View {
     @State private var categories: [CategorySummary] = []
-    @State private var drafts: [DraftSummary] = []
+    @State private var draftCount: Int = 0
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var creatingDraft = false
     @State private var selection: LibrarySelection?
+    @State private var draftsPath = NavigationPath()
     @State private var showingNewCategorySheet = false
     @State private var showingSettingsSheet = false
     @State private var categoryPendingDeletion: CategorySummary?
@@ -73,7 +74,7 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var sidebar: some View {
-        if isLoading && categories.isEmpty && drafts.isEmpty {
+        if isLoading && categories.isEmpty && draftCount == 0 {
             ProgressView()
         } else if let errorMessage {
             VStack(spacing: 12) {
@@ -84,30 +85,14 @@ struct LibraryView: View {
             .padding()
         } else {
             List(selection: $selection) {
-                if !drafts.isEmpty {
+                if draftCount > 0 {
                     Section("Drafts") {
-                        ForEach(drafts) { draft in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(draft.title ?? "Untitled draft").font(.body)
-                                Text("\(draft.messageCount) message\(draft.messageCount == 1 ? "" : "s") · \(draft.updatedAt.formatted(date: .abbreviated, time: .shortened))")
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
-                            .tag(LibrarySelection.draft(id: draft.id))
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Task { await deleteDraft(draft) }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    Task { await deleteDraft(draft) }
-                                } label: {
-                                    Label("Delete Draft", systemImage: "trash")
-                                }
-                            }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Drafts").font(.body)
+                            Text("\(draftCount) \(draftCount == 1 ? "draft" : "drafts")")
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
+                        .tag(LibrarySelection.draftsRoot)
                     }
                 }
                 if categories.isEmpty {
@@ -149,8 +134,12 @@ struct LibraryView: View {
     @ViewBuilder
     private var detail: some View {
         switch selection {
-        case .draft(let id):
-            NavigationStack { DraftView(draftId: id).id(id) }
+        case .draftsRoot:
+            NavigationStack(path: $draftsPath) {
+                DraftsView(onDraftsChanged: {
+                    Task { await load() }
+                })
+            }
         case .category(let id, let name):
             NavigationStack {
                 CategoryView(categoryId: id, categoryName: name, onDeleted: {
@@ -162,7 +151,7 @@ struct LibraryView: View {
         case .none:
             ContentUnavailableView("Select a draft or category",
                 systemImage: "books.vertical",
-                description: Text("Pick a draft to keep working, or open a category to read its stories."))
+                description: Text("Pick a category to read its stories, or open Drafts to keep working."))
         }
     }
 
@@ -172,7 +161,7 @@ struct LibraryView: View {
             async let lib = FabulisAPIClient.shared.library()
             async let drafs = FabulisAPIClient.shared.listDrafts()
             categories = try await lib.categories
-            drafts = try await drafs
+            draftCount = try await drafs.count
         } catch APIError.unauthorized {
             errorMessage = "Session expired."
         } catch {
@@ -194,26 +183,15 @@ struct LibraryView: View {
         }
     }
 
-    private func deleteDraft(_ draft: DraftSummary) async {
-        if case .draft(let id) = selection, id == draft.id {
-            selection = nil
-        }
-        drafts.removeAll { $0.id == draft.id }
-        do {
-            try await FabulisAPIClient.shared.deleteDraft(id: draft.id)
-        } catch {
-            errorMessage = error.localizedDescription
-            await load()
-        }
-    }
-
     private func createDraft() async {
         creatingDraft = true
         defer { creatingDraft = false }
         do {
             let draft = try await FabulisAPIClient.shared.createDraft()
             await load()
-            selection = .draft(id: draft.id)
+            selection = .draftsRoot
+            draftsPath = NavigationPath()
+            draftsPath.append(draft.id)
         } catch {
             errorMessage = error.localizedDescription
         }
