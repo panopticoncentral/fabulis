@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8B43B5032E67F00000F58DA3 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 8B43B5022E67F00000F58DA3 /* MarkdownUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		8B43B41E2E67EF4900F58DA3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8B43B5032E67F00000F58DA3 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +130,7 @@
 			);
 			name = Fabulis;
 			packageProductDependencies = (
+				8B43B5022E67F00000F58DA3 /* MarkdownUI */,
 			);
 			productName = Fabulis;
 			productReference = 8B43B40C2E67EF4700F58DA3 /* Fabulis.app */;
@@ -208,6 +214,9 @@
 			);
 			mainGroup = 8B43B4032E67EF4700F58DA3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8B43B5012E67F00000F58DA3 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8B43B40D2E67EF4700F58DA3 /* Products */;
 			projectDirPath = "";
@@ -583,6 +592,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8B43B5012E67F00000F58DA3 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8B43B5022E67F00000F58DA3 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8B43B5012E67F00000F58DA3 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8B43B4042E67EF4700F58DA3 /* Project object */;
 }

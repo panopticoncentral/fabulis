@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftUI
 
 struct DraftMessageView<Menu: View>: View {
@@ -35,7 +36,9 @@ struct DraftMessageView<Menu: View>: View {
                     .foregroundStyle(role == .response ? Color.accentColor : .secondary)
                 if isStreaming { ProgressView().controlSize(.mini) }
             }
-            Text(content).font(.body).textSelection(.enabled)
+            Markdown(content)
+                .markdownTextStyle { FontSize(.em(1)) }
+                .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftUI
 
 struct StoryMessageView: View {
@@ -22,8 +23,8 @@ struct StoryMessageView: View {
             Text(roleLabel.uppercased())
                 .font(.caption2.bold())
                 .foregroundStyle(roleColor)
-            Text(message.content)
-                .font(.body)
+            Markdown(message.content)
+                .markdownTextStyle { FontSize(.em(1)) }
                 .textSelection(.enabled)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
