@@ -16,7 +16,7 @@ public partial class CategoryImportService
     [GeneratedRegex(@"^Draft\s+(\d{8}T\d{6}Z|\d+)\s+-\s+.+\.md$", RegexOptions.IgnoreCase)]
     private static partial Regex DraftFileNamePattern();
 
-    [GeneratedRegex(@"^\*\*(Me|Paul):?\*\*:?|\*\*(Chat|StoryTeller):?\*\*:?", RegexOptions.None)]
+    [GeneratedRegex(@"^\*\*(Me|Paul):?\*\*:?\s*$|^\*\*(Chat|StoryTeller):?\*\*:?\s*$", RegexOptions.None)]
     private static partial Regex TurnDelimiterPattern();
 
     public async Task<ImportResult> ImportAsync(FabulisDbContext db, string rootPath)
