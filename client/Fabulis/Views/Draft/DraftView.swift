@@ -255,10 +255,43 @@ struct DraftView: View {
                 }
             }
 
-            do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
-            inFlightPrompt = nil
-            streamingContent = ""
-            isStreaming = false
+            if stoppedByUser && !streamingContent.isEmpty {
+                // The server cancels generation asynchronously and persists
+                // the partial response a beat later, so an immediate getDraft
+                // races (and loses) that save — clearing streamingContent
+                // here would make the bubble vanish until a later refetch.
+                // Instead, promote the text we already streamed to a real
+                // message so it stays on screen, then reconcile to the
+                // server's authoritative copy (real ids) once it lands.
+                if var d = draft {
+                    if let inFlightPrompt {
+                        d.messages.append(DraftMessageDto(
+                            id: -3, role: .prompt, content: inFlightPrompt,
+                            sortOrder: Int.max - 1))
+                    }
+                    d.messages.append(DraftMessageDto(
+                        id: -2, role: .response, content: streamingContent,
+                        sortOrder: Int.max))
+                    draft = d
+                }
+                let optimisticCount = draft?.messages.count ?? 0
+                inFlightPrompt = nil
+                streamingContent = ""
+                isStreaming = false
+                for _ in 0..<20 {
+                    if let fetched = try? await FabulisAPIClient.shared.getDraft(id: draftId),
+                       fetched.messages.count >= optimisticCount {
+                        draft = fetched
+                        break
+                    }
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+            } else {
+                do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
+                inFlightPrompt = nil
+                streamingContent = ""
+                isStreaming = false
+            }
         }
     }
 
