@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Fabulis.Server.Data;
 
 namespace Fabulis.Cli;
 
@@ -66,12 +67,43 @@ public partial class SillyTavernConvertService
             var modelName = DeriveModel(turns, file.FullName);
             var (createdUtc, updatedUtc) = DeriveTimestamps(turns, file);
 
-            // Greeting-skip and body emit land in Task 6.
-            _ = storytellerName;
-            _ = modelName;
-            _ = createdUtc;
-            _ = updatedUtc;
-            _ = takenFileNames;
+            // Drop the greeting: the first non-user turn that precedes any user turn.
+            var bodyTurns = turns.ToList();
+            var firstUserIndex = bodyTurns.FindIndex(t => t.IsUser);
+            if (firstUserIndex < 0)
+            {
+                Console.Error.WriteLine($"warn: {file.FullName}: greeting-only chat, skipped");
+                result.FilesSkipped++;
+                continue;
+            }
+            var greetingIndex = -1;
+            for (int i = 0; i < firstUserIndex; i++)
+            {
+                if (!bodyTurns[i].IsUser)
+                {
+                    greetingIndex = i;
+                    break;
+                }
+            }
+            if (greetingIndex >= 0)
+                bodyTurns.RemoveAt(greetingIndex);
+
+            var title = DeriveTitle(bodyTurns);
+            var stamp = createdUtc.ToString("yyyyMMddTHHmmssZ");
+            var baseFileName = $"Draft {stamp} - {title}.md";
+            var fileName = MakeUniqueFileName(baseFileName, takenFileNames);
+
+            var messages = bodyTurns.Select((t, idx) => (
+                Role: t.IsUser ? MessageRole.Prompt : MessageRole.Response,
+                Content: t.Message,
+                SortOrder: idx));
+
+            var content = DraftMarkdownWriter.FormatDraft(
+                storytellerName, modelName, createdUtc, updatedUtc, messages);
+
+            var outputPath = Path.Combine(draftsDir, fileName);
+            await File.WriteAllTextAsync(outputPath, content);
+            result.DraftsWritten++;
         }
 
         return result;
