@@ -83,7 +83,9 @@ static void PrintUsage()
     Console.Error.WriteLine();
     Console.Error.WriteLine("  export <destination>   Write the vault to a directory tree (must not exist).");
     Console.Error.WriteLine("  import <source>        Read a directory tree of categories (and optional");
-    Console.Error.WriteLine("                         _drafts/) into the vault. Idempotent.");
+    Console.Error.WriteLine("                         _drafts/) into the vault. <source> may also be a");
+    Console.Error.WriteLine("                         single category or a folder named _drafts.");
+    Console.Error.WriteLine("                         Idempotent.");
     Console.Error.WriteLine();
     Console.Error.WriteLine("Database location:");
     Console.Error.WriteLine("  Set FABULIS_DB_PATH to point at the SQLCipher .db file. If unset, the CLI");

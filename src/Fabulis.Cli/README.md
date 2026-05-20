@@ -18,13 +18,17 @@ Both commands prompt for the vault password (no echo).
   whether `<source>` is:
   - a **library root** — each immediate subdirectory is treated as a
     category, and an optional `_drafts/` directory alongside the
-    categories is read back into the `Drafts` table; or
+    categories is read back into the `Drafts` table;
   - a **single category** — the immediate subdirectories are treated as
     stories and the category name is the basename of `<source>`. Drafts
-    are not read in this mode.
+    are not read in this mode; or
+  - a **drafts folder** — `<source>` is itself named `_drafts` and its
+    `.md` files are read into the `Drafts` table. No categories or
+    stories are imported.
 
-  Detection rule, applied in order: a `_drafts/` child means library
-  root; otherwise, if any immediate subdirectory contains
+  Detection rule, applied in order: if `<source>` is named `_drafts` it
+  is a drafts folder; otherwise, a `_drafts/` child means library root;
+  otherwise, if any immediate subdirectory contains
   `Version N [<Model>].md` files directly, the source is treated as a
   single category; otherwise, if any grand-subdirectory contains those
   files, the source is treated as a library root. If none of these
