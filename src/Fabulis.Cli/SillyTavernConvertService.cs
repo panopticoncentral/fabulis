@@ -51,7 +51,7 @@ public partial class SillyTavernConvertService
 
             if (turns is null || turns.Count == 0)
             {
-                Console.Error.WriteLine($"warn: {file.FullName}: no conversation turns found, skipped");
+                Console.Error.WriteLine($"warn: {file.FullName}: no conversation turns found, failed");
                 result.FilesFailed++;
                 continue;
             }
@@ -175,7 +175,6 @@ public partial class SillyTavernConvertService
                 }
 
                 turns.Add(new ParsedTurn(
-                    LineNumber: i + 1,
                     Name: nameElem.GetString() ?? "",
                     IsUser: isUser,
                     Message: mesElem.GetString() ?? "",
@@ -265,8 +264,9 @@ public partial class SillyTavernConvertService
         if (collapsed.Length == 0) return "Untitled";
 
         const int Max = 60;
+        bool wasTruncated = collapsed.Length > Max;
         string truncated;
-        if (collapsed.Length <= Max)
+        if (!wasTruncated)
         {
             truncated = collapsed;
         }
@@ -275,13 +275,13 @@ public partial class SillyTavernConvertService
             var cut = collapsed[..Max];
             var lastSpace = cut.LastIndexOf(' ');
             if (lastSpace > Max / 2) cut = cut[..lastSpace];
-            truncated = cut + "…";
+            truncated = cut;
         }
 
         truncated = FilesystemUnsafe().Replace(truncated, "");
         truncated = TrailingPunctuation().Replace(truncated, "");
         if (string.IsNullOrWhiteSpace(truncated)) return "Untitled";
-        return truncated;
+        return wasTruncated ? truncated + "…" : truncated;
     }
 
     private static string MakeUniqueFileName(string baseFileName, HashSet<string> taken)
@@ -300,7 +300,6 @@ public partial class SillyTavernConvertService
     }
 
     private record ParsedTurn(
-        int LineNumber,
         string Name,
         bool IsUser,
         string Message,
