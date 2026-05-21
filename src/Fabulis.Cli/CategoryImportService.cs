@@ -47,11 +47,15 @@ public partial class CategoryImportService
                 await ImportCategoryAsync(db, root, result);
                 break;
 
+            case ImportShape.DraftsOnly:
+                await ImportDraftsAsync(db, root, result);
+                break;
+
             case ImportShape.Unknown:
                 throw new InvalidOperationException(
-                    $"Could not determine whether '{rootPath}' is a library root or a single category. " +
-                    "Expected either category subdirectories or story subdirectories containing " +
-                    "'Version N [<Model>].md' files.");
+                    $"Could not determine whether '{rootPath}' is a library root, a single category, " +
+                    "or a drafts folder. Expected either category subdirectories or story subdirectories " +
+                    "containing 'Version N [<Model>].md' files, or a directory named '_drafts'.");
 
             default:
                 throw new UnreachableException($"Unhandled ImportShape: {shape}");
@@ -63,6 +67,12 @@ public partial class CategoryImportService
 
     private static ImportShape DetectImportShape(DirectoryInfo root)
     {
+        // Rule 0: a directory literally named _drafts is a drafts-only import.
+        // This is unambiguous because the export reserves "_drafts" as the
+        // drafts folder name, so it can't collide with a real category.
+        if (string.Equals(root.Name, "_drafts", StringComparison.OrdinalIgnoreCase))
+            return ImportShape.DraftsOnly;
+
         var children = root.GetDirectories();
 
         // Rule 1: a _drafts/ child is conclusive evidence of a library root.
@@ -95,6 +105,7 @@ public partial class CategoryImportService
     {
         LibraryRoot,
         SingleCategory,
+        DraftsOnly,
         Unknown
     }
 

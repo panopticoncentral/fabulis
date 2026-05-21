@@ -1,4 +1,3 @@
-using System.Text;
 using Fabulis.Server.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -57,7 +56,7 @@ public class CategoryExportService
                 {
                     var fileName = $"Version {version.VersionNumber} [{version.ModelName}].md";
                     var filePath = Path.Combine(storyDir, fileName);
-                    var content = FormatConversation(
+                    var content = DraftMarkdownWriter.FormatConversation(
                         version.Messages.Select(m => (m.Role, m.Content, m.SortOrder)));
                     await File.WriteAllTextAsync(filePath, content);
                     result.VersionsExported++;
@@ -81,7 +80,13 @@ public class CategoryExportService
                     .ToString("yyyyMMddTHHmmssZ");
                 var fileName = $"Draft {stamp} - {title}.md";
                 var filePath = Path.Combine(draftsDir, fileName);
-                var content = FormatDraft(draft);
+                var storytellerName = draft.Storyteller?.Name ?? "(unknown)";
+                var modelName = draft.Storyteller?.ModelName ?? "(unknown)";
+                var createdUtc = DateTime.SpecifyKind(draft.CreatedAt, DateTimeKind.Utc);
+                var updatedUtc = DateTime.SpecifyKind(draft.UpdatedAt, DateTimeKind.Utc);
+                var content = DraftMarkdownWriter.FormatDraft(
+                    storytellerName, modelName, createdUtc, updatedUtc,
+                    draft.Messages.Select(m => (m.Role, m.Content, m.SortOrder)));
                 await File.WriteAllTextAsync(filePath, content);
                 result.DraftsExported++;
             }
@@ -90,46 +95,6 @@ public class CategoryExportService
         return result;
     }
 
-    private static string FormatDraft(Draft draft)
-    {
-        var storytellerName = draft.Storyteller?.Name ?? "(unknown)";
-        var modelName = draft.Storyteller?.ModelName ?? "(unknown)";
-        var createdUtc = DateTime.SpecifyKind(draft.CreatedAt, DateTimeKind.Utc);
-        var updatedUtc = DateTime.SpecifyKind(draft.UpdatedAt, DateTimeKind.Utc);
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"Storyteller: {storytellerName}");
-        sb.AppendLine($"Model: {modelName}");
-        sb.AppendLine($"Created: {createdUtc:O}");
-        sb.AppendLine($"Updated: {updatedUtc:O}");
-        sb.AppendLine();
-        sb.Append(FormatConversation(
-            draft.Messages.Select(m => (m.Role, m.Content, m.SortOrder))));
-        return sb.ToString();
-    }
-
-    private static string FormatConversation(IEnumerable<(MessageRole Role, string Content, int SortOrder)> messages)
-    {
-        var ordered = messages.OrderBy(m => m.SortOrder).ToList();
-        var sb = new StringBuilder();
-
-        foreach (var message in ordered)
-        {
-            var label = message.Role switch
-            {
-                MessageRole.Prompt => "**Me:**",
-                MessageRole.Response => "**StoryTeller:**",
-                _ => throw new InvalidOperationException($"Unknown role: {message.Role}")
-            };
-
-            sb.AppendLine(label);
-            sb.AppendLine();
-            sb.AppendLine(message.Content);
-            sb.AppendLine();
-        }
-
-        return sb.ToString();
-    }
 }
 
 public class ExportResult
