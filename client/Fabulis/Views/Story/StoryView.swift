@@ -7,7 +7,8 @@ struct StoryView: View {
     @State private var detail: StoryDetail?
     @State private var selectedVersion: Int?
     @State private var versionDetail: StoryVersionDetail?
-    @State private var errorMessage: String?
+    @State private var storyError: String?
+    @State private var versionError: String?
     @State private var isLoadingStory = true
     @State private var isLoadingVersion = false
 
@@ -28,13 +29,19 @@ struct StoryView: View {
                     }
                 } else if isLoadingVersion {
                     ProgressView()
-                } else if let errorMessage {
-                    errorView(errorMessage)
+                } else if let versionError {
+                    errorView("Couldn't load version", versionError) {
+                        if let selectedVersion {
+                            Task { await loadVersion(selectedVersion) }
+                        }
+                    }
                 }
             } else if isLoadingStory {
                 ProgressView()
-            } else if let errorMessage {
-                errorView(errorMessage)
+            } else if let storyError {
+                errorView("Couldn't load story", storyError) {
+                    Task { await loadStory() }
+                }
             }
         }
         .navigationTitle(detail?.title ?? fallbackTitle)
@@ -67,11 +74,11 @@ struct StoryView: View {
     }
 
     @ViewBuilder
-    private func errorView(_ message: String) -> some View {
+    private func errorView(_ headline: String, _ message: String, retry: @escaping () -> Void) -> some View {
         VStack(spacing: 12) {
-            Text("Couldn't load story").font(.headline)
+            Text(headline).font(.headline)
             Text(message).font(.caption).foregroundStyle(.secondary)
-            Button("Retry") { Task { await loadStory() } }
+            Button("Retry", action: retry)
         }
         .padding()
     }
@@ -84,30 +91,39 @@ struct StoryView: View {
 
     private func loadStory() async {
         isLoadingStory = true
+        storyError = nil
         do {
-            errorMessage = nil
             let storyDetail = try await FabulisAPIClient.shared.story(id: storyId)
             detail = storyDetail
-            // Server returns versions ordered VersionNumber descending, so .first is the latest.
-            if let latest = storyDetail.versions.first?.versionNumber {
-                selectedVersion = latest
-                await loadVersion(latest)
+            // Preserve the current selection across refresh if it still exists;
+            // otherwise default to the latest (versions are ordered descending, so .first).
+            let versionNumbers = storyDetail.versions.map(\.versionNumber)
+            let target = selectedVersion.flatMap { versionNumbers.contains($0) ? $0 : nil }
+                ?? storyDetail.versions.first?.versionNumber
+            if let target {
+                selectedVersion = target
+                await loadVersion(target)
             }
         } catch {
-            errorMessage = error.localizedDescription
+            storyError = error.localizedDescription
         }
         isLoadingStory = false
     }
 
     private func loadVersion(_ version: Int) async {
         isLoadingVersion = true
+        versionError = nil
         versionDetail = nil
         do {
-            errorMessage = nil
-            versionDetail = try await FabulisAPIClient.shared.storyVersion(storyId: storyId, version: version)
+            let result = try await FabulisAPIClient.shared.storyVersion(storyId: storyId, version: version)
+            // Discard a stale result if the user has since selected a different version.
+            guard version == selectedVersion else { return }
+            versionDetail = result
         } catch {
-            errorMessage = error.localizedDescription
+            guard version == selectedVersion else { return }
+            versionError = error.localizedDescription
         }
+        guard version == selectedVersion else { return }
         isLoadingVersion = false
     }
 }
