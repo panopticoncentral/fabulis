@@ -20,7 +20,13 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
 });
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("kokoro", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 builder.Services.AddScoped<OpenRouterService>();
+builder.Services.AddSingleton<KokoroService>();
+builder.Services.AddSingleton<NarrationTokenStore>();
 builder.Services.AddScoped<DraftService>();
 builder.Services.AddSingleton<GenerationManager>();
 
@@ -47,5 +53,6 @@ api.MapSettingsEndpoints();
 api.MapStorytellerEndpoints();
 api.MapDraftEndpoints();
 api.MapModelEndpoints();
+api.MapNarrationEndpoints();
 
 app.Run();

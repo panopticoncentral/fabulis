@@ -12,6 +12,8 @@ struct DraftView: View {
     @State private var errorMessage: String?
     @State private var showSaveSheet = false
     @State private var editingMessage: DraftMessageDto?
+    @State private var narrationAvailable = false
+    @State private var player = NarrationPlayer()
     /// Starts unset. `loadDraft` flips it to the .bottom edge once messages
     /// arrive — initializing with .bottom directly is a no-op (the ScrollView
     /// applies it against empty content, then sees no binding change when the
@@ -23,42 +25,59 @@ struct DraftView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if let draft {
-                        ForEach(Array(draft.messages.enumerated()), id: \.element.id) { idx, msg in
-                            let isLast = idx == draft.messages.count - 1
-                            let isLastResponse = isLast && msg.role == .response
-                            DraftMessageView(message: msg) {
-                                Button {
-                                    editingMessage = msg
-                                } label: { Label("Edit", systemImage: "pencil") }
-                                if isLastResponse {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        if let draft {
+                            ForEach(Array(draft.messages.enumerated()), id: \.element.id) { idx, msg in
+                                let isLast = idx == draft.messages.count - 1
+                                let isLastResponse = isLast && msg.role == .response
+                                DraftMessageView(
+                                    message: msg,
+                                    isCurrentlyPlaying: player.currentBubbleId == msg.id
+                                ) {
+                                    if narrationAvailable, msg.role == .response, msg.id >= 0 {
+                                        Button { startNarration(from: msg.id) } label: {
+                                            Label("Play from here", systemImage: "play.fill")
+                                        }
+                                        Divider()
+                                    }
                                     Button {
-                                        Task { await regenerate() }
-                                    } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
+                                        editingMessage = msg
+                                    } label: { Label("Edit", systemImage: "pencil") }
+                                    if isLastResponse {
+                                        Button {
+                                            Task { await regenerate() }
+                                        } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
+                                    }
+                                    Divider()
+                                    Button(role: .destructive) {
+                                        Task { await deleteMessage(msg.id) }
+                                    } label: { Label("Delete and after", systemImage: "trash") }
                                 }
-                                Divider()
-                                Button(role: .destructive) {
-                                    Task { await deleteMessage(msg.id) }
-                                } label: { Label("Delete and after", systemImage: "trash") }
+                                .id(msg.id)
                             }
                         }
+                        if let inFlightPrompt {
+                            DraftMessageView(message: DraftMessageDto(
+                                id: -1, role: .prompt, content: inFlightPrompt, sortOrder: Int.max))
+                        }
+                        if isStreaming {
+                            DraftMessageView(streamingResponse: streamingContent)
+                        }
+                        if let errorMessage {
+                            Text(errorMessage).foregroundStyle(.red).padding(.top, 8)
+                        }
                     }
-                    if let inFlightPrompt {
-                        DraftMessageView(message: DraftMessageDto(
-                            id: -1, role: .prompt, content: inFlightPrompt, sortOrder: Int.max))
-                    }
-                    if isStreaming {
-                        DraftMessageView(streamingResponse: streamingContent)
-                    }
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red).padding(.top, 8)
+                    .padding()
+                }
+                .scrollPosition($scrollPosition, anchor: .bottom)
+                .onChange(of: player.currentBubbleId) { _, new in
+                    if let new {
+                        withAnimation { proxy.scrollTo(new, anchor: .center) }
                     }
                 }
-                .padding()
             }
-            .scrollPosition($scrollPosition, anchor: .bottom)
 
             Divider()
             inputBar
@@ -83,7 +102,16 @@ struct DraftView: View {
                 })
         }
         .task { await loadDraft() }
-        .onDisappear { streamTask?.cancel() }
+        .onDisappear {
+            streamTask?.cancel()
+            player.stop()
+        }
+        .safeAreaInset(edge: .bottom) {
+            if player.isVisible {
+                NarrationBar(player: player)
+            }
+        }
+        .task { await loadNarrationAvailability() }
     }
 
     private var inputBar: some View {
@@ -144,6 +172,7 @@ struct DraftView: View {
     }
 
     private func submit() async {
+        player.stop()
         let pending = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
         prompt = ""
@@ -152,6 +181,7 @@ struct DraftView: View {
     }
 
     private func editAndResubmit(messageId: Int, content: String) async {
+        player.stop()
         // Optimistically reflect the server-side mutation: rewrite the edited
         // message's content and drop everything after it. The streamed response
         // arrives via the streaming pane; no separate inFlightPrompt needed
@@ -172,6 +202,7 @@ struct DraftView: View {
     }
 
     private func regenerate() async {
+        player.stop()
         if var d = draft, d.messages.last?.role == .response {
             d.messages.removeLast()
             draft = d
@@ -296,11 +327,26 @@ struct DraftView: View {
     }
 
     private func deleteMessage(_ messageId: Int) async {
+        player.stop()
         do {
             try await FabulisAPIClient.shared.deleteDraftMessage(draftId: draftId, messageId: messageId)
             draft = try await FabulisAPIClient.shared.getDraft(id: draftId)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func loadNarrationAvailability() async {
+        if let s = try? await FabulisAPIClient.shared.settings() {
+            narrationAvailable = s.narrationAvailable
+        }
+    }
+
+    private func startNarration(from bubbleId: Int) {
+        guard let draft else { return }
+        let responses = draft.messages
+            .filter { $0.role == .response && $0.id >= 0 }
+            .map { (id: $0.id, text: $0.content) }
+        player.start(bubbles: responses, from: bubbleId)
     }
 }

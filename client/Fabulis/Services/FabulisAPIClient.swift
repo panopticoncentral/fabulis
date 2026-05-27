@@ -281,8 +281,33 @@ actor FabulisAPIClient {
         try await request("GET", path: "/settings", authed: true)
     }
 
-    func updateSettings(_ body: SettingsUpdateRequest) async throws {
-        try await requestVoid("PUT", path: "/settings", body: body, authed: true)
+    func updateSettings(
+        apiKey: String? = nil,
+        assistantModel: String? = nil,
+        autoLockSelection: String? = nil,
+        kokoroBaseUrl: String? = nil,
+        narrationVoice: String? = nil,
+        narrationSpeed: Double? = nil
+    ) async throws {
+        struct Body: Encodable {
+            let apiKey: String?
+            let assistantModel: String?
+            let autoLockSelection: String?
+            let kokoroBaseUrl: String?
+            let narrationVoice: String?
+            let narrationSpeed: Double?
+        }
+        try await requestVoid(
+            "PUT",
+            path: "/settings",
+            body: Body(
+                apiKey: apiKey,
+                assistantModel: assistantModel,
+                autoLockSelection: autoLockSelection,
+                kokoroBaseUrl: kokoroBaseUrl,
+                narrationVoice: narrationVoice,
+                narrationSpeed: narrationSpeed),
+            authed: true)
     }
 
     func models() async throws -> [ModelInfo] {
@@ -388,6 +413,20 @@ actor FabulisAPIClient {
         }
     }
 
+    // Returns raw response bytes for endpoints whose payload is not JSON
+    // (e.g. /narration/synthesize returns audio/mpeg).
+    private func requestBytes(
+        _ method: String,
+        path: String,
+        body: (some Encodable)? = Optional<EmptyBody>.none,
+        authed: Bool
+    ) async throws -> Data {
+        let req = try await buildRequest(method: method, path: path, body: body, authed: authed)
+        let (data, response) = try await transport(req)
+        try validate(response: response, data: data)
+        return data
+    }
+
     private func request<T: Decodable>(_ method: String, path: String, authed: Bool, timeout: TimeInterval? = nil) async throws -> T {
         return try await request(method, path: path, body: Optional<EmptyBody>.none, authed: authed, timeout: timeout)
     }
@@ -452,4 +491,43 @@ actor FabulisAPIClient {
     }
 
     private struct EmptyBody: Encodable {}
+
+    // MARK: - Narration
+
+    func narrationVoices() async throws -> [NarrationVoice] {
+        let resp: VoicesResponse = try await request("GET", path: "/narration/voices", authed: true)
+        return resp.voices
+    }
+
+    /// Validates the synthesis params with the server (which strips markdown,
+    /// resolves voice/speed defaults, and checks the text length) and gets
+    /// back a one-shot token. Use `playNarrationURL(token:)` to construct
+    /// the GET URL that AVPlayer can fetch natively.
+    func prepareNarration(text: String, voice: String?, speed: Double?) async throws -> String {
+        struct Body: Encodable {
+            let text: String
+            let voice: String?
+            let speed: Double?
+        }
+        struct Response: Decodable { let token: String }
+        let resp: Response = try await request(
+            "POST",
+            path: "/narration/prepare",
+            body: Body(text: text, voice: voice, speed: speed),
+            authed: true)
+        return resp.token
+    }
+
+    /// Builds the public GET URL for the streaming audio. The token itself
+    /// is the credential (one-shot, 5-minute TTL), so this URL doesn't need
+    /// an Authorization header — which lets AVPlayer fetch it via its
+    /// native HTTP path with no special configuration.
+    func playNarrationURL(token: String) async throws -> URL {
+        guard let serverURL = try await keychain.loadServerURL() else { throw APIError.notConfigured }
+        guard var components = URLComponents(string: serverURL) else { throw APIError.invalidURL }
+        let trimmed = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+        components.path = trimmed + "/api/v1/narration/play/" + token
+        guard let url = components.url else { throw APIError.invalidURL }
+        return url
+    }
 }

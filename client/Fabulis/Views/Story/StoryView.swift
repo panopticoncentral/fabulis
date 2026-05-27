@@ -11,6 +11,8 @@ struct StoryView: View {
     @State private var versionError: String?
     @State private var isLoadingStory = true
     @State private var isLoadingVersion = false
+    @State private var narrationAvailable = false
+    @State private var player = NarrationPlayer()
 
     var body: some View {
         Group {
@@ -19,13 +21,25 @@ struct StoryView: View {
                     ContentUnavailableView("No versions yet", systemImage: "doc.text",
                         description: Text("This story has no saved versions."))
                 } else if let versionDetail {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(versionDetail.messages) { message in
-                                StoryMessageView(message: message)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(versionDetail.messages) { message in
+                                    StoryMessageView(
+                                        message: message,
+                                        isCurrentlyPlaying: player.currentBubbleId == message.id,
+                                        narrationAvailable: narrationAvailable,
+                                        onPlayFromHere: { startNarration(from: message.id) })
+                                        .id(message.id)
+                                }
+                            }
+                            .padding()
+                        }
+                        .onChange(of: player.currentBubbleId) { _, new in
+                            if let new {
+                                withAnimation { proxy.scrollTo(new, anchor: .center) }
                             }
                         }
-                        .padding()
                     }
                 } else if isLoadingVersion {
                     ProgressView()
@@ -69,8 +83,17 @@ struct StoryView: View {
                 }
             }
         }
-        .task { await loadStory() }
+        .safeAreaInset(edge: .bottom) {
+            if player.isVisible {
+                NarrationBar(player: player)
+            }
+        }
+        .task {
+            await loadStory()
+            await loadNarrationAvailability()
+        }
         .refreshable { await loadStory() }
+        .onDisappear { player.stop() }
     }
 
     @ViewBuilder
@@ -85,6 +108,7 @@ struct StoryView: View {
 
     private func select(version: Int) {
         guard version != selectedVersion else { return }
+        player.stop()
         selectedVersion = version
         Task { await loadVersion(version) }
     }
@@ -95,8 +119,6 @@ struct StoryView: View {
         do {
             let storyDetail = try await FabulisAPIClient.shared.story(id: storyId)
             detail = storyDetail
-            // Preserve the current selection across refresh if it still exists;
-            // otherwise default to the latest (versions are ordered descending, so .first).
             let versionNumbers = storyDetail.versions.map(\.versionNumber)
             let target = selectedVersion.flatMap { versionNumbers.contains($0) ? $0 : nil }
                 ?? storyDetail.versions.first?.versionNumber
@@ -116,7 +138,6 @@ struct StoryView: View {
         versionDetail = nil
         do {
             let result = try await FabulisAPIClient.shared.storyVersion(storyId: storyId, version: version)
-            // Discard a stale result if the user has since selected a different version.
             guard version == selectedVersion else { return }
             versionDetail = result
         } catch {
@@ -125,5 +146,19 @@ struct StoryView: View {
         }
         guard version == selectedVersion else { return }
         isLoadingVersion = false
+    }
+
+    private func loadNarrationAvailability() async {
+        if let s = try? await FabulisAPIClient.shared.settings() {
+            narrationAvailable = s.narrationAvailable
+        }
+    }
+
+    private func startNarration(from bubbleId: Int) {
+        guard let versionDetail else { return }
+        let responses = versionDetail.messages
+            .filter { $0.role == .response }
+            .map { (id: $0.id, text: $0.content) }
+        player.start(bubbles: responses, from: bubbleId)
     }
 }

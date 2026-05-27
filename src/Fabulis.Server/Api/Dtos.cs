@@ -61,12 +61,25 @@ public sealed record StoryMessageDto(
 public sealed record SettingsDto(
     bool ApiKeyIsSet,
     string? AssistantModel,
-    string AutoLockSelection); // "1"/"5"/"15"/"30"/"60"/"never"
+    string AutoLockSelection, // "1"/"5"/"15"/"30"/"60"/"never"
+    bool KokoroBaseUrlIsSet,
+    string? NarrationVoice,
+    double NarrationSpeed,
+    bool NarrationAvailable);
 
 public sealed record SettingsUpdateRequest(
-    string? ApiKey,            // null = leave alone
-    string? AssistantModel,    // null = leave alone
-    string? AutoLockSelection); // null = leave alone, otherwise one of the legal strings
+    string? ApiKey,             // null = leave alone
+    string? AssistantModel,     // null = leave alone
+    string? AutoLockSelection,  // null = leave alone, otherwise one of the legal strings
+    string? KokoroBaseUrl,      // null = leave alone; empty string = clear
+    string? NarrationVoice,     // null = leave alone
+    double? NarrationSpeed);    // null = leave alone
+
+// ---------- narration ----------
+public sealed record NarrationVoiceDto(string Id, string DisplayName, string Language);
+public sealed record VoicesResponse(IReadOnlyList<NarrationVoiceDto> Voices);
+public sealed record SynthesizeRequest(string Text, string? Voice, double? Speed);
+public sealed record PrepareResponse(string Token);
 
 // ---------- storyteller ----------
 public sealed record StorytellerDto(

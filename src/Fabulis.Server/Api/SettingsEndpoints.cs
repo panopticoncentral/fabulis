@@ -13,16 +13,24 @@ public static class SettingsEndpoints
     {
         var group = routes.MapGroup("/settings").RequireSession();
 
-        group.MapGet("", async (FabulisDbContext db) =>
+        group.MapGet("", async (FabulisDbContext db, KokoroService kokoro, CancellationToken ct) =>
         {
-            var apiKey = await db.AppSettings.FindAsync("OpenRouterApiKey");
-            var assistantModel = await db.AppSettings.FindAsync("AssistantModel");
-            var autoLock = await db.AppSettings.FindAsync("AutoLockMinutes");
+            var apiKey = await db.AppSettings.FindAsync(["OpenRouterApiKey"], ct);
+            var assistantModel = await db.AppSettings.FindAsync(["AssistantModel"], ct);
+            var autoLock = await db.AppSettings.FindAsync(["AutoLockMinutes"], ct);
+            var kokoroUrl = await db.AppSettings.FindAsync(["KokoroBaseUrl"], ct);
+            var narrationVoice = await db.AppSettings.FindAsync(["NarrationVoice"], ct);
+            var narrationSpeed = await db.AppSettings.FindAsync(["NarrationSpeed"], ct);
 
             var dto = new SettingsDto(
                 ApiKeyIsSet: apiKey is not null && !string.IsNullOrEmpty(apiKey.Value),
                 AssistantModel: assistantModel?.Value,
-                AutoLockSelection: NormalizeAutoLock(autoLock?.Value));
+                AutoLockSelection: NormalizeAutoLock(autoLock?.Value),
+                KokoroBaseUrlIsSet: kokoroUrl is not null && !string.IsNullOrWhiteSpace(kokoroUrl.Value),
+                NarrationVoice: narrationVoice?.Value,
+                NarrationSpeed: NarrationValidation.NormalizeSpeed(null, narrationSpeed?.Value),
+                NarrationAvailable: await kokoro.ProbeAsync(ct)
+                    && !string.IsNullOrWhiteSpace(narrationVoice?.Value));
 
             return Results.Ok(dto);
         });
@@ -30,7 +38,8 @@ public static class SettingsEndpoints
         group.MapPut("", async (
             SettingsUpdateRequest body,
             FabulisDbContext db,
-            VaultService vault) =>
+            VaultService vault,
+            KokoroService kokoro) =>
         {
             if (body.ApiKey is { } apiKey && !string.IsNullOrWhiteSpace(apiKey))
                 await UpsertAsync(db, "OpenRouterApiKey", apiKey.Trim());
@@ -45,6 +54,32 @@ public static class SettingsEndpoints
 
                 await UpsertAsync(db, "AutoLockMinutes", autoLock);
                 vault.ConfigureAutoLock(autoLock.Equals("never", StringComparison.OrdinalIgnoreCase) ? null : int.Parse(autoLock));
+            }
+
+            if (body.KokoroBaseUrl is { } urlInput)
+            {
+                var trimmed = urlInput.Trim();
+                if (trimmed.Length == 0)
+                {
+                    await UpsertAsync(db, "KokoroBaseUrl", "");
+                }
+                else
+                {
+                    if (!NarrationValidation.IsBaseUrlValid(trimmed))
+                        return Results.BadRequest(new { error = "kokoroBaseUrl must be a valid http(s) URL" });
+                    await UpsertAsync(db, "KokoroBaseUrl", NarrationValidation.NormalizeBaseUrl(trimmed));
+                }
+                kokoro.InvalidateCaches();
+            }
+
+            if (body.NarrationVoice is { } voice && !string.IsNullOrWhiteSpace(voice))
+                await UpsertAsync(db, "NarrationVoice", voice.Trim());
+
+            if (body.NarrationSpeed is { } speed)
+            {
+                if (!NarrationValidation.IsSpeedValid(speed))
+                    return Results.BadRequest(new { error = $"narrationSpeed must be between {NarrationValidation.MinSpeed} and {NarrationValidation.MaxSpeed}" });
+                await UpsertAsync(db, "NarrationSpeed", speed.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
             }
 
             await db.SaveChangesAsync();

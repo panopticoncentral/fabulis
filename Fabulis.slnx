@@ -3,4 +3,7 @@
     <Project Path="src/Fabulis.Server/Fabulis.Server.csproj" />
     <Project Path="src/Fabulis.Cli/Fabulis.Cli.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Fabulis.Server.Tests/Fabulis.Server.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -77,6 +77,20 @@ struct SettingsDto: Decodable, Sendable {
     let apiKeyIsSet: Bool
     let assistantModel: String?
     let autoLockSelection: String
+    let kokoroBaseUrlIsSet: Bool
+    let narrationVoice: String?
+    let narrationSpeed: Double
+    let narrationAvailable: Bool
+}
+
+struct NarrationVoice: Decodable, Identifiable, Sendable {
+    let id: String
+    let displayName: String
+    let language: String
+}
+
+struct VoicesResponse: Decodable, Sendable {
+    let voices: [NarrationVoice]
 }
 
 // MARK: - Drafts

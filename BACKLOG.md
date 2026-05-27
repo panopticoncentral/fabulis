@@ -33,6 +33,18 @@ and re-subscribe instead of giving up.
 
 Originally deferred in the Phase 3 plan.
 
+### Background narration playback
+
+Narration stops when you leave the story or draft view. A global
+mini-player + `AVAudioSession.Category.playback` survival across
+backgrounding, plus `MPNowPlayingInfoCenter` /
+`MPRemoteCommandCenter` wiring for lock-screen controls, would let
+you keep listening while browsing the library or with the screen
+off.
+
+Originally deferred in the narration v1 spec at
+`docs/superpowers/specs/2026-05-26-narration-design.md`.
+
 ## Posture / hardening
 
 ### Scoped TLS posture
