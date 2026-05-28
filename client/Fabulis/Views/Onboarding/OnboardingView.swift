@@ -41,7 +41,7 @@ struct OnboardingView: View {
                             Text("Vault password").font(.headline)
                             SecureField("Vault password", text: $password)
                                 .textFieldStyle(.roundedBorder)
-                                .textContentType(.password)
+                                .textContentType(.oneTimeCode)
                                 .focused($focused, equals: .password)
                         }
                         if let errorMessage {

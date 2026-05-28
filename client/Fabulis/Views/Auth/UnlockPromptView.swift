@@ -17,6 +17,7 @@ struct UnlockPromptView: View {
                 Text("Locked").font(.title.bold())
                 if let serverURL { Text(serverURL).font(.callout).foregroundStyle(.secondary) }
                 SecureField("Vault password", text: $password)
+                    .textContentType(.oneTimeCode)
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
                     .padding(.horizontal)
