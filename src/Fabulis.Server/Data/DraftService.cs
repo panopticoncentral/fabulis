@@ -130,25 +130,6 @@ public class DraftService(FabulisDbContext db)
         await db.SaveChangesAsync();
     }
 
-    public async Task<bool> DeleteLastResponseAsync(int draftId)
-    {
-        var lastMessage = await db.DraftMessages
-            .Where(m => m.DraftId == draftId)
-            .OrderByDescending(m => m.SortOrder)
-            .FirstOrDefaultAsync();
-
-        if (lastMessage is null || lastMessage.Role != MessageRole.Response)
-            return false;
-
-        db.DraftMessages.Remove(lastMessage);
-
-        var draft = await db.Drafts.FindAsync(draftId);
-        if (draft is not null) draft.UpdatedAt = DateTime.UtcNow;
-
-        await db.SaveChangesAsync();
-        return true;
-    }
-
     public async Task<StoryVersion> SaveToLibraryAsync(int draftId, int categoryId, int? storyId, string? newStoryTitle)
     {
         var draft = await db.Drafts

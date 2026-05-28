@@ -29,9 +29,7 @@ struct DraftView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         if let draft {
-                            ForEach(Array(draft.messages.enumerated()), id: \.element.id) { idx, msg in
-                                let isLast = idx == draft.messages.count - 1
-                                let isLastResponse = isLast && msg.role == .response
+                            ForEach(draft.messages, id: \.id) { msg in
                                 DraftMessageView(
                                     message: msg,
                                     isCurrentlyPlaying: player.currentBubbleId == msg.id
@@ -45,9 +43,9 @@ struct DraftView: View {
                                     Button {
                                         editingMessage = msg
                                     } label: { Label("Edit", systemImage: "pencil") }
-                                    if isLastResponse {
+                                    if msg.role == .prompt, msg.id >= 0 {
                                         Button {
-                                            Task { await regenerate() }
+                                            Task { await editAndResubmit(messageId: msg.id, content: msg.content) }
                                         } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
                                     }
                                     Divider()
@@ -198,16 +196,6 @@ struct DraftView: View {
         }
         let stream = await FabulisAPIClient.shared.editAndResubmit(
             draftId: draftId, messageId: messageId, content: content)
-        runStream(inFlight: nil, initial: stream)
-    }
-
-    private func regenerate() async {
-        player.stop()
-        if var d = draft, d.messages.last?.role == .response {
-            d.messages.removeLast()
-            draft = d
-        }
-        let stream = await FabulisAPIClient.shared.regenerate(draftId: draftId)
         runStream(inFlight: nil, initial: stream)
     }
 

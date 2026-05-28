@@ -152,28 +152,6 @@ public static class DraftEndpoints
             return await StreamGeneration(http, gen, ct);
         });
 
-        group.MapPost("/{id:int}/regenerate", async (
-            int id,
-            DraftService drafts,
-            GenerationManager gens,
-            HttpContext http,
-            CancellationToken ct) =>
-        {
-            var initial = await drafts.GetDraftAsync(id);
-            if (initial is null) return Results.NotFound();
-
-            if (gens.IsRunning(id))
-                return Results.Conflict(new { error = "a generation is already in progress" });
-
-            await drafts.DeleteLastResponseAsync(id);
-            var draft = await drafts.GetDraftAsync(id);
-            if (draft is null || draft.Messages.Count == 0)
-                return Results.BadRequest(new { error = "no messages to regenerate from" });
-
-            var gen = gens.Start(id);
-            return await StreamGeneration(http, gen, ct);
-        });
-
         // Re-attach to an in-flight (or recently-completed) generation for
         // this draft. Used by the client to resume after a network drop —
         // e.g. the iPhone backgrounded the app mid-stream and URLSession
