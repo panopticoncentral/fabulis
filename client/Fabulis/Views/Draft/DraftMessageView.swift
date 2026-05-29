@@ -6,17 +6,23 @@ struct DraftMessageView<Menu: View>: View {
     let content: String
     let isStreaming: Bool
     let isCurrentlyPlaying: Bool
+    let isEditing: Bool
+    let isDimmed: Bool
     let menu: () -> Menu
 
     init(
         message: DraftMessageDto,
         isCurrentlyPlaying: Bool = false,
+        isEditing: Bool = false,
+        isDimmed: Bool = false,
         @ViewBuilder menu: @escaping () -> Menu
     ) {
         self.role = message.role
         self.content = message.content
         self.isStreaming = false
         self.isCurrentlyPlaying = isCurrentlyPlaying
+        self.isEditing = isEditing
+        self.isDimmed = isDimmed
         self.menu = menu
     }
 
@@ -25,6 +31,8 @@ struct DraftMessageView<Menu: View>: View {
         self.content = content
         self.isStreaming = true
         self.isCurrentlyPlaying = false
+        self.isEditing = false
+        self.isDimmed = false
         self.menu = menu
     }
 
@@ -51,8 +59,9 @@ struct DraftMessageView<Menu: View>: View {
         .padding(12)
         .background(role == .response ? Color.accentColor.opacity(0.06) : Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .opacity(isDimmed ? 0.4 : 1)
         .overlay {
-            if isCurrentlyPlaying {
+            if isEditing || isCurrentlyPlaying {
                 RoundedRectangle(cornerRadius: 10)
                     .strokeBorder(Color.accentColor, lineWidth: 2)
             }
@@ -62,8 +71,18 @@ struct DraftMessageView<Menu: View>: View {
 }
 
 extension DraftMessageView where Menu == EmptyView {
-    init(message: DraftMessageDto, isCurrentlyPlaying: Bool = false) {
-        self.init(message: message, isCurrentlyPlaying: isCurrentlyPlaying, menu: { EmptyView() })
+    init(
+        message: DraftMessageDto,
+        isCurrentlyPlaying: Bool = false,
+        isEditing: Bool = false,
+        isDimmed: Bool = false
+    ) {
+        self.init(
+            message: message,
+            isCurrentlyPlaying: isCurrentlyPlaying,
+            isEditing: isEditing,
+            isDimmed: isDimmed,
+            menu: { EmptyView() })
     }
     init(streamingResponse content: String) {
         self.init(streamingResponse: content, menu: { EmptyView() })

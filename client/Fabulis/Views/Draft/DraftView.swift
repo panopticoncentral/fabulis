@@ -12,6 +12,7 @@ struct DraftView: View {
     @State private var errorMessage: String?
     @State private var showSaveSheet = false
     @State private var editingMessage: DraftMessageDto?
+    @State private var stashedPrompt: String?
     @State private var narrationAvailable = false
     @State private var player = NarrationPlayer()
     /// Starts unset. `loadDraft` flips it to the .bottom edge once messages
@@ -32,7 +33,13 @@ struct DraftView: View {
                             ForEach(draft.messages, id: \.id) { msg in
                                 DraftMessageView(
                                     message: msg,
-                                    isCurrentlyPlaying: player.currentBubbleId == msg.id
+                                    isCurrentlyPlaying: player.currentBubbleId == msg.id,
+                                    isEditing: editingMessage?.id == msg.id,
+                                    isDimmed: DraftEditLogic.isDimmed(
+                                        draft.messages,
+                                        editingId: editingMessage?.id,
+                                        editingRole: editingMessage?.role,
+                                        bubbleId: msg.id)
                                 ) {
                                     if narrationAvailable, msg.role == .response, msg.id >= 0 {
                                         Button { startNarration(from: msg.id) } label: {
@@ -40,9 +47,12 @@ struct DraftView: View {
                                         }
                                         Divider()
                                     }
-                                    Button {
-                                        editingMessage = msg
-                                    } label: { Label("Edit", systemImage: "pencil") }
+                                    if msg.id >= 0 {
+                                        Button {
+                                            beginEdit(msg)
+                                        } label: { Label("Edit", systemImage: "pencil") }
+                                            .disabled(isStreaming)
+                                    }
                                     if msg.role == .prompt, msg.id >= 0 {
                                         Button {
                                             Task { await editAndResubmit(messageId: msg.id, content: msg.content) }
@@ -90,15 +100,6 @@ struct DraftView: View {
         .sheet(isPresented: $showSaveSheet) {
             SaveDraftSheet(draftId: draftId, draftTitle: draft?.title)
         }
-        .fullScreenCover(item: $editingMessage) { msg in
-            EditMessageSheet(
-                draftId: draftId,
-                message: msg,
-                onSaved: { Task { await reloadDraft() } },
-                onSaveAndResubmit: { newContent in
-                    Task { await editAndResubmit(messageId: msg.id, content: newContent) }
-                })
-        }
         .task { await loadDraft() }
         .onDisappear {
             streamTask?.cancel()
@@ -113,40 +114,90 @@ struct DraftView: View {
     }
 
     private var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField("Prompt", text: $prompt, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...5)
-                .focused($promptFocused)
-                .disabled(isStreaming)
-                .onKeyPress(keys: [.return]) { keyPress in
-                    if keyPress.modifiers.contains(.shift) { return .ignored }
-                    let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty, !isStreaming else { return .ignored }
-                    Task { await submit() }
-                    return .handled
+        VStack(alignment: .leading, spacing: 8) {
+            if let editingMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: "pencil")
+                    Text(DraftEditLogic.bannerText(
+                        role: editingMessage.role,
+                        messagesAfter: DraftEditLogic.messagesAfter(
+                            draft?.messages ?? [], editingId: editingMessage.id)))
                 }
-            Button {
-                if isStreaming {
-                    // Generation runs server-side independent of the HTTP
-                    // request, so cancelling the local Task alone won't stop
-                    // it. Tell the server to abort, then drop the stream
-                    // locally — the server's "done" envelope (with the
-                    // partial response saved) may not reach us once we cancel.
-                    Task { try? await FabulisAPIClient.shared.abortStream(draftId: draftId) }
-                    streamTask?.cancel()
-                } else {
-                    Task { await submit() }
-                }
-            } label: {
-                Image(systemName: isStreaming ? "stop.fill" : "paperplane.fill")
-                    .padding(.horizontal, 4)
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(isStreaming ? .red : .accentColor)
-            .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField("Prompt", text: $prompt, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...5)
+                    .focused($promptFocused)
+                    .disabled(isStreaming && editingMessage == nil)
+                    .onKeyPress(keys: [.return]) { keyPress in
+                        if keyPress.modifiers.contains(.shift) { return .ignored }
+                        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return .ignored }
+                        if editingMessage != nil {
+                            Task { await saveEdit() }
+                            return .handled
+                        }
+                        guard !isStreaming else { return .ignored }
+                        Task { await submit() }
+                        return .handled
+                    }
+                    .onKeyPress(.escape) {
+                        guard editingMessage != nil else { return .ignored }
+                        cancelEdit()
+                        return .handled
+                    }
+                if editingMessage == nil {
+                    sendButton
+                } else {
+                    editButtons
+                }
+            }
         }
         .padding()
+    }
+
+    private var sendButton: some View {
+        Button {
+            if isStreaming {
+                // Generation runs server-side independent of the HTTP
+                // request, so cancelling the local Task alone won't stop
+                // it. Tell the server to abort, then drop the stream
+                // locally — the server's "done" envelope (with the
+                // partial response saved) may not reach us once we cancel.
+                Task { try? await FabulisAPIClient.shared.abortStream(draftId: draftId) }
+                streamTask?.cancel()
+            } else {
+                Task { await submit() }
+            }
+        } label: {
+            Image(systemName: isStreaming ? "stop.fill" : "paperplane.fill")
+                .padding(.horizontal, 4)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(isStreaming ? .red : .accentColor)
+        .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    @ViewBuilder
+    private var editButtons: some View {
+        let canSave = !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        Button("Cancel") { cancelEdit() }
+            .buttonStyle(.bordered)
+        Button("Save") { Task { await saveEdit() } }
+            .buttonStyle(.borderedProminent)
+            .disabled(!canSave)
+        if editingMessage?.role == .prompt {
+            Button {
+                Task { await resubmitEdit() }
+            } label: {
+                Label("Resubmit", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+            .disabled(!canSave)
+        }
     }
 
     private func loadDraft() async {
@@ -176,6 +227,47 @@ struct DraftView: View {
         prompt = ""
         let stream = await FabulisAPIClient.shared.streamMessage(draftId: draftId, prompt: pending)
         runStream(inFlight: pending, initial: stream)
+    }
+
+    private func beginEdit(_ msg: DraftMessageDto) {
+        player.stop()
+        stashedPrompt = prompt
+        prompt = msg.content
+        editingMessage = msg
+        promptFocused = true
+    }
+
+    private func cancelEdit() {
+        prompt = stashedPrompt ?? ""
+        stashedPrompt = nil
+        editingMessage = nil
+    }
+
+    private func saveEdit() async {
+        guard let msg = editingMessage else { return }
+        let content = prompt
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        do {
+            try await FabulisAPIClient.shared.editDraftMessage(
+                draftId: draftId, messageId: msg.id, content: content)
+            prompt = stashedPrompt ?? ""
+            stashedPrompt = nil
+            editingMessage = nil
+            await reloadDraft()
+        } catch {
+            // Stay in edit mode so the user's text is preserved.
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func resubmitEdit() async {
+        guard let msg = editingMessage else { return }
+        let content = prompt
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        prompt = stashedPrompt ?? ""
+        stashedPrompt = nil
+        editingMessage = nil
+        await editAndResubmit(messageId: msg.id, content: content)
     }
 
     private func editAndResubmit(messageId: Int, content: String) async {
