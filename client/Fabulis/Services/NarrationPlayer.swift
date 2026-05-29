@@ -54,9 +54,9 @@ final class NarrationPlayer: NSObject {
     private var player: AVPlayer?
     private var currentItem: AVPlayerItem?
     private var statusObservation: NSKeyValueObservation?
-    nonisolated(unsafe) private var endObserver: NSObjectProtocol?
+    @ObservationIgnored private var endObserver: NSObjectProtocol?
     private var prepareTask: Task<Void, Never>?
-    nonisolated(unsafe) private var timer: Timer?
+    @ObservationIgnored private var timer: Timer?
 
     deinit {
         timer?.invalidate()

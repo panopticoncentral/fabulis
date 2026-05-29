@@ -39,6 +39,26 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+/// Parses the two ISO 8601 shapes .NET emits. `ISO8601DateFormatter` is
+/// documented as thread-safe for parsing but isn't marked `Sendable`, so this
+/// wrapper is `@unchecked Sendable` to let the `@Sendable` date-decoding
+/// closure capture a single value rather than two bare formatters.
+private struct ISO8601DateParser: @unchecked Sendable {
+    private let withFractionalSeconds: ISO8601DateFormatter
+    private let plain: ISO8601DateFormatter
+
+    init() {
+        withFractionalSeconds = ISO8601DateFormatter()
+        withFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+    }
+
+    func date(from str: String) -> Date? {
+        withFractionalSeconds.date(from: str) ?? plain.date(from: str)
+    }
+}
+
 actor FabulisAPIClient {
     static let shared = FabulisAPIClient()
 
@@ -57,16 +77,12 @@ actor FabulisAPIClient {
         // fractional seconds (e.g. "2026-05-02T13:24:45.1234567Z"). Swift's
         // .iso8601 strategy uses ISO8601DateFormatter without
         // .withFractionalSeconds, so it rejects those strings. Try both.
-        let withFracs = ISO8601DateFormatter()
-        withFracs.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let plain = ISO8601DateFormatter()
-        plain.formatOptions = [.withInternetDateTime]
+        let dateParser = ISO8601DateParser()
 
         self.decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { dec in
             let str = try dec.singleValueContainer().decode(String.self)
-            if let d = withFracs.date(from: str) { return d }
-            if let d = plain.date(from: str) { return d }
+            if let d = dateParser.date(from: str) { return d }
             throw DecodingError.dataCorruptedError(
                 in: try dec.singleValueContainer(),
                 debugDescription: "Unrecognized ISO 8601 date: \(str)")
