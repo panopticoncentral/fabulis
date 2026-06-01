@@ -195,7 +195,12 @@ struct LibraryView: View {
         switch selection {
         case .draft(let id):
             NavigationStack {
-                DraftView(draftId: id).id(id)
+                DraftView(draftId: id, onDraftChanged: { summary in
+                    if let idx = drafts.firstIndex(where: { $0.id == summary.id }) {
+                        drafts[idx] = summary
+                    }
+                })
+                .id(id)
             }
         case .category(let id, let name):
             NavigationStack {

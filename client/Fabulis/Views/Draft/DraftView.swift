@@ -2,6 +2,10 @@ import SwiftUI
 
 struct DraftView: View {
     let draftId: Int
+    /// Called when the draft settles to a new server-truth state so the
+    /// Library sidebar can refresh this draft's row (title, message count)
+    /// without waiting for a full reload.
+    var onDraftChanged: (DraftSummary) -> Void = { _ in }
 
     @State private var draft: DraftDetail?
     @State private var prompt: String = ""
@@ -210,6 +214,7 @@ struct DraftView: View {
             // binding unchanged and the scroll un-applied.
             scrollPosition.scrollTo(edge: .bottom)
             promptFocused = true
+            notifyDraftChanged()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -218,6 +223,20 @@ struct DraftView: View {
     private func reloadDraft() async {
         do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) }
         catch { errorMessage = error.localizedDescription }
+        notifyDraftChanged()
+    }
+
+    /// Push the draft's current summary up to the Library sidebar. Counts only
+    /// persisted messages (id >= 0) so optimistic placeholders don't inflate
+    /// the row's count; title/timestamps come straight from the server detail.
+    private func notifyDraftChanged() {
+        guard let draft else { return }
+        onDraftChanged(DraftSummary(
+            id: draft.id,
+            title: draft.title,
+            createdAt: draft.createdAt,
+            updatedAt: draft.updatedAt,
+            messageCount: draft.messages.filter { $0.id >= 0 }.count))
     }
 
     private func submit() async {
@@ -397,11 +416,13 @@ struct DraftView: View {
                     }
                     try? await Task.sleep(for: .milliseconds(250))
                 }
+                notifyDraftChanged()
             } else {
                 do { draft = try await FabulisAPIClient.shared.getDraft(id: draftId) } catch {}
                 inFlightPrompt = nil
                 streamingContent = ""
                 isStreaming = false
+                notifyDraftChanged()
             }
         }
     }
@@ -411,6 +432,7 @@ struct DraftView: View {
         do {
             try await FabulisAPIClient.shared.deleteDraftMessage(draftId: draftId, messageId: messageId)
             draft = try await FabulisAPIClient.shared.getDraft(id: draftId)
+            notifyDraftChanged()
         } catch {
             errorMessage = error.localizedDescription
         }
