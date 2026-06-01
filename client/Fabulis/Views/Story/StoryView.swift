@@ -59,6 +59,7 @@ struct StoryView: View {
             }
         }
         .navigationTitle(detail?.title ?? fallbackTitle)
+        .modelSubtitle(versionDetail?.modelName)
         .toolbar {
             if let detail, !detail.versions.isEmpty, let selectedVersion {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -160,5 +161,41 @@ struct StoryView: View {
             .filter { $0.role == .response }
             .map { (id: $0.id, text: $0.content) }
         player.start(bubbles: responses, from: bubbleId)
+    }
+}
+
+private extension View {
+    /// Shows the model name beneath the navigation title.
+    ///
+    /// On iPhone we use the native `navigationSubtitle` (iOS 26+), which renders
+    /// under the nav-bar title. On Mac Catalyst that modifier only feeds the window
+    /// title bar, which isn't visible here, so we pin a subtitle bar under the nav bar.
+    @ViewBuilder
+    func modelSubtitle(_ subtitle: String?) -> some View {
+        let model = (subtitle?.isEmpty == false) ? subtitle : nil
+        #if targetEnvironment(macCatalyst)
+        if let model {
+            safeAreaInset(edge: .top, spacing: 0) {
+                VStack(spacing: 0) {
+                    Text(model)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+                    Divider()
+                }
+                .background(.bar)
+            }
+        } else {
+            self
+        }
+        #else
+        if #available(iOS 26.0, *), let model {
+            navigationSubtitle(model)
+        } else {
+            self
+        }
+        #endif
     }
 }
