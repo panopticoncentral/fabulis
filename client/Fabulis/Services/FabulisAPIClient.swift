@@ -300,6 +300,12 @@ actor FabulisAPIClient {
         try await requestVoid("PUT", path: "/storyteller", body: body, authed: true)
     }
 
+    func generateTitle(draftId: Int) async throws -> String {
+        let resp: GenerateTitleResponse = try await request(
+            "POST", path: "/drafts/\(draftId)/generate-title", authed: true)
+        return resp.title
+    }
+
     /// Re-attaches to an in-flight (or recently-completed) generation for
     /// `draftId`. The first envelope is `snapshot` (full content so far),
     /// followed by live deltas, and a terminal `done`/`error` envelope.

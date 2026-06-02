@@ -151,6 +151,7 @@ struct StorytellerDto: Decodable, Sendable {
     let id: Int
     let name: String
     let prompt: String
+    let titlingPrompt: String
     let modelName: String
     let temperature: Double
     let topP: Double?
@@ -163,6 +164,7 @@ struct StorytellerDto: Decodable, Sendable {
 struct StorytellerUpdateRequest: Encodable, Sendable {
     let name: String
     let prompt: String
+    let titlingPrompt: String
     let modelName: String
     let temperature: Double
     let topP: Double?
@@ -170,6 +172,10 @@ struct StorytellerUpdateRequest: Encodable, Sendable {
     let minP: Double?
     let topK: Int?
     let topA: Double?
+}
+
+struct GenerateTitleResponse: Decodable, Sendable {
+    let title: String
 }
 
 struct CreateCategoryRequest: Encodable, Sendable { let name: String }
