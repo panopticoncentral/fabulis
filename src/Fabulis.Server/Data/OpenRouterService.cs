@@ -14,7 +14,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
 
     public async Task<string> ChatAsync(string model, string systemPrompt, string userMessage,
         double temperature = 0.7, double? topP = null, int? maxTokens = null,
-        double? minP = null, int? topK = null, double? topA = null)
+        double? minP = null, int? topK = null, double? topA = null,
+        bool disableReasoning = false)
     {
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
             ?? throw new InvalidOperationException("OpenRouter API key is not configured. Set it in Settings.");
@@ -43,6 +44,12 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             requestBody["top_k"] = topK.Value;
         if (topA.HasValue)
             requestBody["top_a"] = topA.Value;
+        // A title needs no chain-of-thought. Disabling reasoning keeps the call
+        // fast and cheap on hybrid/reasoning models, and — combined with no
+        // max_tokens cap — prevents reasoning tokens from consuming the whole
+        // budget and leaving an empty completion.
+        if (disableReasoning)
+            requestBody["reasoning"] = new { enabled = false };
 
         var response = await client.PostAsJsonAsync(
             "https://openrouter.ai/api/v1/chat/completions",

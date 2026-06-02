@@ -121,9 +121,15 @@ public static class DraftEndpoints
                 draft.Storyteller.TitlingPrompt,
                 body,
                 temperature: 0.3,
-                maxTokens: 32);
+                disableReasoning: true);
 
-            return Results.Ok(new GenerateTitleResponse(TitleGeneration.CleanTitle(raw)));
+            var title = TitleGeneration.CleanTitle(raw);
+            if (string.IsNullOrWhiteSpace(title))
+                return Results.Json(
+                    new { error = "the model returned an empty title — try again, or adjust the titling prompt or storyteller model" },
+                    statusCode: StatusCodes.Status502BadGateway);
+
+            return Results.Ok(new GenerateTitleResponse(title));
         });
 
         group.MapDelete("/{draftId:int}/messages/{messageId:int}", async (
