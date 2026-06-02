@@ -104,6 +104,28 @@ public static class DraftEndpoints
             return Results.Ok(new SaveDraftResponse(version.StoryId, version.Id, version.VersionNumber));
         });
 
+        group.MapPost("/{id:int}/generate-title", async (
+            int id,
+            DraftService drafts,
+            OpenRouterService openRouter) =>
+        {
+            var draft = await drafts.GetDraftAsync(id);
+            if (draft is null) return Results.NotFound();
+
+            var body = TitleGeneration.BuildStoryBody(draft.Messages);
+            if (string.IsNullOrWhiteSpace(body))
+                return Results.BadRequest(new { error = "the draft has no story content to title yet" });
+
+            var raw = await openRouter.ChatAsync(
+                draft.Storyteller.ModelName,
+                draft.Storyteller.TitlingPrompt,
+                body,
+                temperature: 0.3,
+                maxTokens: 32);
+
+            return Results.Ok(new GenerateTitleResponse(TitleGeneration.CleanTitle(raw)));
+        });
+
         group.MapDelete("/{draftId:int}/messages/{messageId:int}", async (
             int draftId,
             int messageId,

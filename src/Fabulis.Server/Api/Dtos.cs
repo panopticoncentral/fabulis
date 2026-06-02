@@ -149,6 +149,8 @@ public sealed record SaveDraftResponse(
     int VersionId,
     int VersionNumber);
 
+public sealed record GenerateTitleResponse(string Title);
+
 public sealed record CreateCategoryRequest(string Name);
 public sealed record RenameCategoryRequest(string Name);
 public sealed record ModelInfoDto(string Id, string Name);
