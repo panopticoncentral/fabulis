@@ -4,6 +4,7 @@ struct StorytellerEditorView: View {
     @State private var existing: StorytellerDto?
     @State private var name: String = ""
     @State private var prompt: String = ""
+    @State private var titlingPrompt: String = ""
     @State private var modelName: String = ""
     @State private var temperature: Double = 0.7
     @State private var topP: String = ""
@@ -22,6 +23,9 @@ struct StorytellerEditorView: View {
             }
             Section("System prompt") {
                 TextEditor(text: $prompt).frame(minHeight: 120)
+            }
+            Section("Titling prompt") {
+                TextEditor(text: $titlingPrompt).frame(minHeight: 100)
             }
             Section("Model") {
                 NavigationLink {
@@ -73,6 +77,7 @@ struct StorytellerEditorView: View {
             existing = s
             name = s.name
             prompt = s.prompt
+            titlingPrompt = s.titlingPrompt
             modelName = s.modelName
             temperature = s.temperature
             topP = s.topP.map { String($0) } ?? ""
@@ -91,6 +96,7 @@ struct StorytellerEditorView: View {
             try await FabulisAPIClient.shared.updateStoryteller(StorytellerUpdateRequest(
                 name: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 prompt: prompt,
+                titlingPrompt: titlingPrompt,
                 modelName: modelName.trimmingCharacters(in: .whitespacesAndNewlines),
                 temperature: temperature,
                 topP: Double(topP),
