@@ -17,7 +17,7 @@ public static class StorytellerEndpoints
                 return Results.NotFound();
 
             return Results.Ok(new StorytellerDto(
-                s.Id, s.Name, s.Prompt, s.ModelName,
+                s.Id, s.Name, s.Prompt, s.TitlingPrompt, s.ModelName,
                 s.Temperature, s.TopP, s.MaxTokens, s.MinP, s.TopK, s.TopA));
         });
 
@@ -36,6 +36,7 @@ public static class StorytellerEndpoints
 
             s.Name = body.Name.Trim();
             s.Prompt = body.Prompt;
+            s.TitlingPrompt = body.TitlingPrompt;
             s.ModelName = body.ModelName.Trim();
             s.Temperature = body.Temperature;
             s.TopP = body.TopP;

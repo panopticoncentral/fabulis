@@ -86,6 +86,7 @@ public sealed record StorytellerDto(
     int Id,
     string Name,
     string Prompt,
+    string TitlingPrompt,
     string ModelName,
     double Temperature,
     double? TopP,
@@ -97,6 +98,7 @@ public sealed record StorytellerDto(
 public sealed record StorytellerUpdateRequest(
     string Name,
     string Prompt,
+    string TitlingPrompt,
     string ModelName,
     double Temperature,
     double? TopP,
