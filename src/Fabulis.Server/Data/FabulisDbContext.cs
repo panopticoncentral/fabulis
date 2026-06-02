@@ -62,12 +62,17 @@ public class FabulisDbContext : DbContext
 
     public async Task EnsureSchemaUpdatedAsync()
     {
+        // Escaped for embedding in the raw-SQL DEFAULT clauses below. Keep
+        // this escaping if DefaultTitlingPrompt is ever edited to contain an
+        // apostrophe, or schema bootstrap will produce broken SQL.
+        var titlingDefaultSql = Storyteller.DefaultTitlingPrompt.Replace("'", "''");
+
         await Database.ExecuteSqlRawAsync($"""
             CREATE TABLE IF NOT EXISTS Storytellers (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Name TEXT NOT NULL,
                 Prompt TEXT NOT NULL,
-                TitlingPrompt TEXT NOT NULL DEFAULT '{Storyteller.DefaultTitlingPrompt}',
+                TitlingPrompt TEXT NOT NULL DEFAULT '{titlingDefaultSql}',
                 ModelName TEXT NOT NULL,
                 Temperature REAL NOT NULL DEFAULT 0.7,
                 TopP REAL NULL,
@@ -88,7 +93,7 @@ public class FabulisDbContext : DbContext
         if (!storytellerColumns.Contains("TitlingPrompt"))
         {
             await Database.ExecuteSqlRawAsync(
-                $"ALTER TABLE Storytellers ADD COLUMN TitlingPrompt TEXT NOT NULL DEFAULT '{Storyteller.DefaultTitlingPrompt}'");
+                $"ALTER TABLE Storytellers ADD COLUMN TitlingPrompt TEXT NOT NULL DEFAULT '{titlingDefaultSql}'");
         }
 
         await Database.ExecuteSqlRawAsync("""
