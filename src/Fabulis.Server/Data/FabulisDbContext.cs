@@ -62,11 +62,12 @@ public class FabulisDbContext : DbContext
 
     public async Task EnsureSchemaUpdatedAsync()
     {
-        await Database.ExecuteSqlRawAsync("""
+        await Database.ExecuteSqlRawAsync($"""
             CREATE TABLE IF NOT EXISTS Storytellers (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Name TEXT NOT NULL,
                 Prompt TEXT NOT NULL,
+                TitlingPrompt TEXT NOT NULL DEFAULT '{Storyteller.DefaultTitlingPrompt}',
                 ModelName TEXT NOT NULL,
                 Temperature REAL NOT NULL DEFAULT 0.7,
                 TopP REAL NULL,
@@ -77,6 +78,18 @@ public class FabulisDbContext : DbContext
                 CreatedAt TEXT NOT NULL DEFAULT '0001-01-01 00:00:00'
             )
             """);
+
+        // Storytellers gained TitlingPrompt after the initial release.
+        // CREATE TABLE IF NOT EXISTS above never alters an existing table,
+        // so add the column on vaults created before this field existed.
+        var storytellerColumns = await Database
+            .SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('Storytellers')")
+            .ToListAsync();
+        if (!storytellerColumns.Contains("TitlingPrompt"))
+        {
+            await Database.ExecuteSqlRawAsync(
+                $"ALTER TABLE Storytellers ADD COLUMN TitlingPrompt TEXT NOT NULL DEFAULT '{Storyteller.DefaultTitlingPrompt}'");
+        }
 
         await Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS AppSettings (
@@ -123,6 +136,7 @@ public class FabulisDbContext : DbContext
         {
             Name = "Storyteller",
             Prompt = "You are a helpful storyteller.",
+            TitlingPrompt = Storyteller.DefaultTitlingPrompt,
             ModelName = string.IsNullOrWhiteSpace(assistantModel) ? "anthropic/claude-sonnet-4" : assistantModel,
             Temperature = 0.7,
             CreatedAt = DateTime.UtcNow,
