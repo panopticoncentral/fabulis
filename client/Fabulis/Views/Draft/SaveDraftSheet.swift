@@ -12,6 +12,7 @@ struct SaveDraftSheet: View {
     @State private var selectedStoryId: Int? = nil
     @State private var newStoryTitle: String = ""
     @State private var isSaving = false
+    @State private var isGeneratingTitle = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -45,6 +46,16 @@ struct SaveDraftSheet: View {
                 if selectedStoryId == nil {
                     Section("Story title") {
                         TextField("Story title", text: $newStoryTitle)
+                        Button {
+                            Task { await generateTitle() }
+                        } label: {
+                            if isGeneratingTitle {
+                                HStack { ProgressView(); Text("Generating…") }
+                            } else {
+                                Label("Generate", systemImage: "sparkles")
+                            }
+                        }
+                        .disabled(isGeneratingTitle)
                     }
                 }
 
@@ -91,6 +102,18 @@ struct SaveDraftSheet: View {
         do {
             let detail = try await FabulisAPIClient.shared.category(id: categoryId)
             storiesInCategory = detail.stories
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func generateTitle() async {
+        errorMessage = nil
+        isGeneratingTitle = true
+        defer { isGeneratingTitle = false }
+        do {
+            let title = try await FabulisAPIClient.shared.generateTitle(draftId: draftId)
+            newStoryTitle = title
         } catch {
             errorMessage = error.localizedDescription
         }
