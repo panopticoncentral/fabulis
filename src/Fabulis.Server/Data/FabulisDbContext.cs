@@ -67,6 +67,10 @@ public class FabulisDbContext : DbContext
         // apostrophe, or schema bootstrap will produce broken SQL.
         var titlingDefaultSql = Storyteller.DefaultTitlingPrompt.Replace("'", "''");
 
+        // EF1002: the interpolated value is a compile-time constant that we
+        // single-quote-escape above, and a column DEFAULT in DDL cannot be
+        // parameterized — so the injection warning does not apply here.
+#pragma warning disable EF1002
         await Database.ExecuteSqlRawAsync($"""
             CREATE TABLE IF NOT EXISTS Storytellers (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,6 +99,7 @@ public class FabulisDbContext : DbContext
             await Database.ExecuteSqlRawAsync(
                 $"ALTER TABLE Storytellers ADD COLUMN TitlingPrompt TEXT NOT NULL DEFAULT '{titlingDefaultSql}'");
         }
+#pragma warning restore EF1002
 
         await Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS AppSettings (
