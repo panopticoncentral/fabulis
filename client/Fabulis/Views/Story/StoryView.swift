@@ -174,22 +174,28 @@ private extension View {
     func modelSubtitle(_ subtitle: String?) -> some View {
         let model = (subtitle?.isEmpty == false) ? subtitle : nil
         #if targetEnvironment(macCatalyst)
-        if let model {
-            safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    Text(model)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal)
-                        .padding(.vertical, 6)
-                    Divider()
+        // Pin the model strip under the nav bar. The title must use inline display
+        // mode here: a large title renders in the same top region and the pinned
+        // bar would draw over it (you'd briefly see the title, then only the model).
+        Group {
+            if let model {
+                safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        Text(model)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                            .padding(.vertical, 6)
+                        Divider()
+                    }
+                    .background(.bar)
                 }
-                .background(.bar)
+            } else {
+                self
             }
-        } else {
-            self
         }
+        .navigationBarTitleDisplayMode(.inline)
         #else
         if #available(iOS 26.0, *), let model {
             navigationSubtitle(model)
