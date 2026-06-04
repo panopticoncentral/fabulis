@@ -15,7 +15,9 @@ public sealed record CategorySummaryDto(
     string Name,
     DateTime CreatedAt,
     int StoryCount,
-    string? LatestStoryTitle);
+    string? LatestStoryTitle,
+    int PromptCount,
+    string? LatestPromptTitle);
 
 public sealed record CategoryDto(
     int Id,
@@ -56,6 +58,40 @@ public sealed record StoryMessageDto(
     MessageRole Role,
     string Content,
     int SortOrder);
+
+// ---------- prompts ----------
+public sealed record PromptSummaryDto(
+    int Id,
+    string Title,
+    DateTime CreatedAt,
+    int MessageCount);
+
+public sealed record PromptCategoryDto(
+    int Id,
+    string Name,
+    DateTime CreatedAt,
+    IReadOnlyList<PromptSummaryDto> Prompts);
+
+public sealed record PromptDto(
+    int Id,
+    int CategoryId,
+    string CategoryName,
+    string Title,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    IReadOnlyList<PromptMessageDto> Messages);
+
+public sealed record PromptMessageDto(
+    int Id,
+    string Content,
+    int SortOrder);
+
+public sealed record CreatePromptRequest(int CategoryId, string? Title);
+
+public sealed record UpdatePromptRequest(
+    string Title,
+    int CategoryId,
+    IReadOnlyList<string> Messages);
 
 // ---------- settings ----------
 public sealed record SettingsDto(

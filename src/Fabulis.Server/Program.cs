@@ -28,6 +28,7 @@ builder.Services.AddScoped<OpenRouterService>();
 builder.Services.AddSingleton<KokoroService>();
 builder.Services.AddSingleton<NarrationTokenStore>();
 builder.Services.AddScoped<DraftService>();
+builder.Services.AddScoped<PromptService>();
 builder.Services.AddSingleton<GenerationManager>();
 
 var app = builder.Build();
@@ -52,6 +53,7 @@ api.MapStoryEndpoints();
 api.MapSettingsEndpoints();
 api.MapStorytellerEndpoints();
 api.MapDraftEndpoints();
+api.MapPromptEndpoints();
 api.MapModelEndpoints();
 api.MapNarrationEndpoints();
 

@@ -9,6 +9,18 @@ delete it from here.
 
 ## Functional gaps
 
+### Prompt → draft conversion
+
+Prompts can be defined and viewed (own tab, category-grouped, dedicated
+editor), but there is no way to turn a prompt into a draft yet — i.e.
+seed a new draft's conversation from a prompt's user-side messages and
+hand it to a storyteller to generate from. Needs a "Start draft from
+prompt" action plus server support to materialize a `Draft` (and its
+`DraftMessage`s) from a `Prompt`.
+
+Originally deferred in the Prompts category plan
+(`docs/superpowers/plans/2026-06-03-prompts-category.md`).
+
 ### Reasoning chunks UI
 
 The SSE protocol carries reasoning chunks (`reasoning: true` envelope

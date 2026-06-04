@@ -161,6 +161,28 @@ actor FabulisAPIClient {
         try await request("GET", path: "/categories/\(id)", authed: true)
     }
 
+    func categoryPrompts(categoryId: Int) async throws -> PromptCategoryDetail {
+        try await request("GET", path: "/categories/\(categoryId)/prompts", authed: true)
+    }
+
+    func prompt(id: Int) async throws -> PromptDetail {
+        try await request("GET", path: "/prompts/\(id)", authed: true)
+    }
+
+    func createPrompt(categoryId: Int, title: String?) async throws -> PromptDetail {
+        let body = CreatePromptRequest(categoryId: categoryId, title: title)
+        return try await request("POST", path: "/prompts", body: body, authed: true)
+    }
+
+    func updatePrompt(id: Int, title: String, categoryId: Int, messages: [String]) async throws -> PromptDetail {
+        let body = UpdatePromptRequest(title: title, categoryId: categoryId, messages: messages)
+        return try await request("PUT", path: "/prompts/\(id)", body: body, authed: true)
+    }
+
+    func deletePrompt(id: Int) async throws {
+        try await requestVoid("DELETE", path: "/prompts/\(id)", authed: true)
+    }
+
     func story(id: Int) async throws -> StoryDetail {
         try await request("GET", path: "/stories/\(id)", authed: true)
     }

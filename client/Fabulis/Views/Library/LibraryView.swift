@@ -44,7 +44,7 @@ struct LibraryView: View {
                             }
                        },
                        message: { _ in
-                            Text("This deletes the category and all its stories. This cannot be undone.")
+                            Text("This deletes the category and all its stories and prompts. This cannot be undone.")
                        })
                 .alert("Delete draft?",
                        isPresented: Binding(
@@ -82,7 +82,7 @@ struct LibraryView: View {
                     }
                 }
                 .disabled(creatingDraft)
-            case .stories:
+            case .stories, .prompts:
                 Button { showingNewCategorySheet = true } label: {
                     Label("New Category", systemImage: "folder.badge.plus")
                 }
@@ -126,7 +126,7 @@ struct LibraryView: View {
         } else {
             switch selectedKind {
             case .drafts: draftsList
-            case .stories: categoriesList
+            case .stories, .prompts: categoriesList
             }
         }
     }
@@ -169,7 +169,7 @@ struct LibraryView: View {
         } else {
             List(selection: $selection) {
                 ForEach(categories) { category in
-                    CategoryRow(category: category)
+                    CategoryRow(category: category, kind: selectedKind)
                         .tag(LibrarySelection.category(id: category.id, name: category.name))
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -204,11 +204,19 @@ struct LibraryView: View {
             }
         case .category(let id, let name):
             NavigationStack {
-                CategoryView(categoryId: id, categoryName: name, onDeleted: {
-                    selection = nil
-                    Task { await load() }
-                })
-                .id(id)
+                if selectedKind == .prompts {
+                    PromptCategoryView(categoryId: id, categoryName: name, onDeleted: {
+                        selection = nil
+                        Task { await load() }
+                    })
+                    .id(id)
+                } else {
+                    CategoryView(categoryId: id, categoryName: name, onDeleted: {
+                        selection = nil
+                        Task { await load() }
+                    })
+                    .id(id)
+                }
             }
         case .none:
             ContentUnavailableView("Select a draft or category",

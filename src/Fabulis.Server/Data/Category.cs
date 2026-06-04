@@ -7,4 +7,5 @@ public class Category
     public DateTime CreatedAt { get; set; }
 
     public List<Story> Stories { get; set; } = [];
+    public List<Prompt> Prompts { get; set; } = [];
 }

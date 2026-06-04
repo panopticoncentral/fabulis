@@ -20,6 +20,8 @@ struct CategorySummary: Decodable, Identifiable, Sendable {
     let createdAt: Date
     let storyCount: Int
     let latestStoryTitle: String?
+    let promptCount: Int
+    let latestPromptTitle: String?
 }
 
 struct CategoryDetail: Decodable, Identifiable, Sendable {
@@ -71,6 +73,49 @@ struct StoryMessage: Decodable, Identifiable, Sendable {
     let role: MessageRole
     let content: String
     let sortOrder: Int
+}
+
+// MARK: - Prompts
+
+struct PromptSummary: Decodable, Identifiable, Sendable {
+    let id: Int
+    let title: String
+    let createdAt: Date
+    let messageCount: Int
+}
+
+struct PromptCategoryDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let name: String
+    let createdAt: Date
+    let prompts: [PromptSummary]
+}
+
+struct PromptDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let categoryId: Int
+    let categoryName: String
+    let title: String
+    let createdAt: Date
+    let updatedAt: Date
+    let messages: [PromptMessage]
+}
+
+struct PromptMessage: Decodable, Identifiable, Sendable {
+    let id: Int
+    let content: String
+    let sortOrder: Int
+}
+
+struct CreatePromptRequest: Encodable, Sendable {
+    let categoryId: Int
+    let title: String?
+}
+
+struct UpdatePromptRequest: Encodable, Sendable {
+    let title: String
+    let categoryId: Int
+    let messages: [String]
 }
 
 struct SettingsDto: Decodable, Sendable {

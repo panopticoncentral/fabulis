@@ -45,6 +45,8 @@ public class FabulisDbContext : DbContext
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<Draft> Drafts => Set<Draft>();
     public DbSet<DraftMessage> DraftMessages => Set<DraftMessage>();
+    public DbSet<Prompt> Prompts => Set<Prompt>();
+    public DbSet<PromptMessage> PromptMessages => Set<PromptMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -127,6 +129,27 @@ public class FabulisDbContext : DbContext
                 Content TEXT NOT NULL,
                 SortOrder INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (DraftId) REFERENCES Drafts(Id) ON DELETE CASCADE
+            )
+            """);
+
+        await Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS Prompts (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CategoryId INTEGER NOT NULL,
+                Title TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL DEFAULT '0001-01-01 00:00:00',
+                UpdatedAt TEXT NOT NULL DEFAULT '0001-01-01 00:00:00',
+                FOREIGN KEY (CategoryId) REFERENCES Categories(Id) ON DELETE CASCADE
+            )
+            """);
+
+        await Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS PromptMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                PromptId INTEGER NOT NULL,
+                Content TEXT NOT NULL,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (PromptId) REFERENCES Prompts(Id) ON DELETE CASCADE
             )
             """);
 
