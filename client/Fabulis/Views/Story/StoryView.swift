@@ -160,7 +160,7 @@ struct StoryView: View {
         let responses = versionDetail.messages
             .filter { $0.role == .response }
             .map { (id: $0.id, text: $0.content) }
-        player.start(bubbles: responses, from: bubbleId)
+        player.start(bubbles: responses, from: bubbleId, title: detail?.title ?? fallbackTitle)
     }
 }
 

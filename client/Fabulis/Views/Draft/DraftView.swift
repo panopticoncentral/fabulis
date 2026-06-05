@@ -136,17 +136,18 @@ struct DraftView: View {
                     .lineLimit(1...5)
                     .focused($promptFocused)
                     .disabled(isStreaming && editingMessage == nil)
-                    .onKeyPress(keys: [.return]) { keyPress in
-                        if keyPress.modifiers.contains(.shift) { return .ignored }
-                        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmed.isEmpty else { return .ignored }
-                        if editingMessage != nil {
-                            Task { await saveEdit() }
-                            return .handled
-                        }
-                        guard !isStreaming else { return .ignored }
-                        Task { await submit() }
-                        return .handled
+                    .background {
+                        // SwiftUI's onKeyPress/onSubmit don't intercept Return
+                        // inside a focused multiline TextField on Mac Catalyst —
+                        // the backing text view inserts a newline before they
+                        // fire. An invisible button bound to the Return shortcut
+                        // fires reliably across Catalyst and iPad hardware
+                        // keyboards. Shift+Return doesn't match the (empty)
+                        // modifier set, so it falls through to the field and
+                        // inserts a newline as expected.
+                        Button(action: handleReturn) { EmptyView() }
+                            .keyboardShortcut(.return, modifiers: [])
+                            .opacity(0)
                     }
                     .onKeyPress(.escape) {
                         guard editingMessage != nil else { return .ignored }
@@ -237,6 +238,20 @@ struct DraftView: View {
             createdAt: draft.createdAt,
             updatedAt: draft.updatedAt,
             messageCount: draft.messages.filter { $0.id >= 0 }.count))
+    }
+
+    /// Plain Return: submit a new prompt, or save an in-progress edit. Empty
+    /// prompts and Return during streaming are no-ops. (Shift+Return never
+    /// reaches here — it's handled by the field as a newline.)
+    private func handleReturn() {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if editingMessage != nil {
+            Task { await saveEdit() }
+            return
+        }
+        guard !isStreaming else { return }
+        Task { await submit() }
     }
 
     private func submit() async {
@@ -449,6 +464,6 @@ struct DraftView: View {
         let responses = draft.messages
             .filter { $0.role == .response && $0.id >= 0 }
             .map { (id: $0.id, text: $0.content) }
-        player.start(bubbles: responses, from: bubbleId)
+        player.start(bubbles: responses, from: bubbleId, title: draft.title)
     }
 }
