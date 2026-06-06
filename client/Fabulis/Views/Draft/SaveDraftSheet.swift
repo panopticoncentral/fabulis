@@ -3,6 +3,9 @@ import SwiftUI
 struct SaveDraftSheet: View {
     let draftId: Int
     let draftTitle: String?
+    /// Called after a successful save so the Library sidebar can refresh its
+    /// category list and story counts.
+    var onSaved: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
     @State private var categories: [CategorySummary] = []
@@ -130,6 +133,7 @@ struct SaveDraftSheet: View {
                 storyId: selectedStoryId,
                 newStoryTitle: selectedStoryId == nil ? newStoryTitle.trimmingCharacters(in: .whitespacesAndNewlines) : nil)
             _ = try await FabulisAPIClient.shared.saveDraft(id: draftId, request: req)
+            onSaved()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

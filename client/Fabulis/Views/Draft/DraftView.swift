@@ -6,6 +6,10 @@ struct DraftView: View {
     /// Library sidebar can refresh this draft's row (title, message count)
     /// without waiting for a full reload.
     var onDraftChanged: (DraftSummary) -> Void = { _ in }
+    /// Called when saving the draft into the library changes category contents
+    /// (a new story, or a new category) so the Library sidebar can refresh its
+    /// counts and category list.
+    var onLibraryChanged: () -> Void = {}
 
     @State private var draft: DraftDetail?
     @State private var prompt: String = ""
@@ -102,7 +106,7 @@ struct DraftView: View {
             }
         }
         .sheet(isPresented: $showSaveSheet) {
-            SaveDraftSheet(draftId: draftId, draftTitle: draft?.title)
+            SaveDraftSheet(draftId: draftId, draftTitle: draft?.title, onSaved: onLibraryChanged)
         }
         .task { await loadDraft() }
         .onDisappear {

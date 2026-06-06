@@ -3,9 +3,9 @@ import Foundation
 /// A switchable category of library content. The single extensibility point
 /// for the library kind-switcher: add a `case` (and its detail view) to grow.
 enum LibraryKind: String, CaseIterable, Identifiable {
+    case prompts
     case drafts
     case stories
-    case prompts
 
     var id: String { rawValue }
 

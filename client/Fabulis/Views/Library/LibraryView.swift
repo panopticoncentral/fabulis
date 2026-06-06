@@ -6,7 +6,7 @@ enum LibrarySelection: Hashable {
 }
 
 struct LibraryView: View {
-    @State private var selectedKind: LibraryKind = .stories
+    @State private var selectedKind: LibraryKind = .prompts
     @State private var categories: [CategorySummary] = []
     @State private var drafts: [DraftSummary] = []
     @State private var isLoading = true
@@ -199,13 +199,17 @@ struct LibraryView: View {
                     if let idx = drafts.firstIndex(where: { $0.id == summary.id }) {
                         drafts[idx] = summary
                     }
+                }, onLibraryChanged: {
+                    Task { await load() }
                 })
                 .id(id)
             }
         case .category(let id, let name):
             NavigationStack {
                 if selectedKind == .prompts {
-                    PromptCategoryView(categoryId: id, categoryName: name, onDeleted: {
+                    PromptCategoryView(categoryId: id, categoryName: name, onChanged: {
+                        Task { await load() }
+                    }, onDeleted: {
                         selection = nil
                         Task { await load() }
                     })
