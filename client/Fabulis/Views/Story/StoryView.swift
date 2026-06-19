@@ -13,6 +13,7 @@ struct StoryView: View {
     @State private var isLoadingVersion = false
     @State private var narrationAvailable = false
     @State private var player = NarrationPlayer()
+    @State private var showingSummary = false
 
     var body: some View {
         Group {
@@ -83,11 +84,24 @@ struct StoryView: View {
                     }
                 }
             }
+            if detail != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingSummary = true
+                    } label: {
+                        Image(systemName: "text.quote")
+                    }
+                    .accessibilityLabel("Summary")
+                }
+            }
         }
         .safeAreaInset(edge: .bottom) {
             if player.isVisible {
                 NarrationBar(player: player)
             }
+        }
+        .sheet(isPresented: $showingSummary) {
+            StorySummarySheet(storyId: storyId)
         }
         .task {
             await loadStory()

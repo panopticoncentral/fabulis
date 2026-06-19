@@ -63,6 +63,16 @@ struct StoryVersionDetail: Decodable, Identifiable, Sendable {
     let messages: [StoryMessage]
 }
 
+struct StorySummaryDetail: Decodable, Sendable {
+    let text: String?
+    let status: String          // "none" | "generating" | "ready" | "failed"
+    let summarizedThroughVersion: Int?
+    let latestVersion: Int
+    let isStale: Bool
+    let updatedAt: Date?
+    let error: String?
+}
+
 enum MessageRole: String, Decodable, Sendable {
     case prompt = "Prompt"
     case response = "Response"
@@ -126,6 +136,8 @@ struct SettingsDto: Decodable, Sendable {
     let narrationVoice: String?
     let narrationSpeed: Double
     let narrationAvailable: Bool
+    let summaryModel: String?
+    let summaryPrompt: String
 }
 
 struct NarrationVoice: Decodable, Identifiable, Sendable {

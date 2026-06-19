@@ -74,7 +74,8 @@ public static class DraftEndpoints
             int id,
             SaveDraftRequest body,
             DraftService drafts,
-            FabulisDbContext db) =>
+            FabulisDbContext db,
+            SummaryService summaries) =>
         {
             var draft = await drafts.GetDraftAsync(id);
             if (draft is null) return Results.NotFound();
@@ -101,6 +102,7 @@ public static class DraftEndpoints
                 return Results.BadRequest(new { error = "storyId or newStoryTitle is required" });
 
             var version = await drafts.SaveToLibraryAsync(id, categoryId, storyId, newStoryTitle);
+            summaries.Enqueue(version.StoryId);
             return Results.Ok(new SaveDraftResponse(version.StoryId, version.Id, version.VersionNumber));
         });
 

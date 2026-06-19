@@ -57,6 +57,16 @@ off.
 Originally deferred in the narration v1 spec at
 `docs/superpowers/specs/2026-05-26-narration-design.md`.
 
+### Summary failure backoff
+
+`SummaryService` retries a failed story on every sweep (~30s) with no
+backoff. For a persistently failing story (bad model id, API outage)
+this re-hits the model each cycle. Acceptable for single-user LAN use;
+add exponential backoff / a max-attempts cap if it becomes noisy.
+
+Originally deferred in the story-summaries plan
+(`docs/superpowers/plans/2026-06-17-story-summaries.md`).
+
 ## Posture / hardening
 
 ### Scoped TLS posture

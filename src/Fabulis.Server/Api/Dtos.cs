@@ -59,6 +59,17 @@ public sealed record StoryMessageDto(
     string Content,
     int SortOrder);
 
+public sealed record SummaryDto(
+    string? Text,
+    string Status,                 // "none" | "generating" | "ready" | "failed"
+    int? SummarizedThroughVersion,
+    int LatestVersion,
+    bool IsStale,
+    DateTime? UpdatedAt,
+    string? Error);
+
+public sealed record UpdateSummaryRequest(string Text);
+
 // ---------- prompts ----------
 public sealed record PromptSummaryDto(
     int Id,
@@ -101,7 +112,9 @@ public sealed record SettingsDto(
     bool KokoroBaseUrlIsSet,
     string? NarrationVoice,
     double NarrationSpeed,
-    bool NarrationAvailable);
+    bool NarrationAvailable,
+    string? SummaryModel,
+    string SummaryPrompt);
 
 public sealed record SettingsUpdateRequest(
     string? ApiKey,             // null = leave alone
@@ -109,7 +122,9 @@ public sealed record SettingsUpdateRequest(
     string? AutoLockSelection,  // null = leave alone, otherwise one of the legal strings
     string? KokoroBaseUrl,      // null = leave alone; empty string = clear
     string? NarrationVoice,     // null = leave alone
-    double? NarrationSpeed);    // null = leave alone
+    double? NarrationSpeed,     // null = leave alone
+    string? SummaryModel,       // null/blank = leave alone
+    string? SummaryPrompt);     // null/blank = leave alone
 
 // ---------- narration ----------
 public sealed record NarrationVoiceDto(string Id, string DisplayName, string Language);

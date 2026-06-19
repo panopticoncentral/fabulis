@@ -60,6 +60,10 @@ public class FabulisDbContext : DbContext
         modelBuilder.Entity<DraftMessage>()
             .Property(m => m.Role)
             .HasConversion<string>();
+
+        modelBuilder.Entity<Story>()
+            .Property(s => s.SummaryStatus)
+            .HasConversion<string>();
     }
 
     public async Task EnsureSchemaUpdatedAsync()
@@ -109,6 +113,21 @@ public class FabulisDbContext : DbContext
                 Value TEXT NOT NULL
             )
             """);
+
+        // Stories gained summary columns after the initial release. EnsureCreated
+        // never alters an existing table, so add them on vaults created before
+        // this feature existed.
+        var storyColumns = await Database
+            .SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('Stories')")
+            .ToListAsync();
+        if (!storyColumns.Contains("SummaryText"))
+        {
+            await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummaryText TEXT NULL");
+            await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummaryStatus TEXT NOT NULL DEFAULT 'None'");
+            await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummarizedThroughVersion INTEGER NULL");
+            await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummaryError TEXT NULL");
+            await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummaryUpdatedAt TEXT NULL");
+        }
 
         await Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS Drafts (

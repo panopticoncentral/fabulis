@@ -21,6 +21,8 @@ public static class SettingsEndpoints
             var kokoroUrl = await db.AppSettings.FindAsync(["KokoroBaseUrl"], ct);
             var narrationVoice = await db.AppSettings.FindAsync(["NarrationVoice"], ct);
             var narrationSpeed = await db.AppSettings.FindAsync(["NarrationSpeed"], ct);
+            var summaryModel = await db.AppSettings.FindAsync(["SummaryModel"], ct);
+            var summaryPrompt = await db.AppSettings.FindAsync(["SummaryPrompt"], ct);
 
             var dto = new SettingsDto(
                 ApiKeyIsSet: apiKey is not null && !string.IsNullOrEmpty(apiKey.Value),
@@ -30,7 +32,11 @@ public static class SettingsEndpoints
                 NarrationVoice: narrationVoice?.Value,
                 NarrationSpeed: NarrationValidation.NormalizeSpeed(null, narrationSpeed?.Value),
                 NarrationAvailable: await kokoro.ProbeAsync(ct)
-                    && !string.IsNullOrWhiteSpace(narrationVoice?.Value));
+                    && !string.IsNullOrWhiteSpace(narrationVoice?.Value),
+                SummaryModel: summaryModel?.Value,
+                SummaryPrompt: string.IsNullOrWhiteSpace(summaryPrompt?.Value)
+                    ? StorySummary.DefaultPrompt
+                    : summaryPrompt!.Value);
 
             return Results.Ok(dto);
         });
@@ -81,6 +87,12 @@ public static class SettingsEndpoints
                     return Results.BadRequest(new { error = $"narrationSpeed must be between {NarrationValidation.MinSpeed} and {NarrationValidation.MaxSpeed}" });
                 await UpsertAsync(db, "NarrationSpeed", speed.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
             }
+
+            if (body.SummaryModel is { } summaryModel && !string.IsNullOrWhiteSpace(summaryModel))
+                await UpsertAsync(db, "SummaryModel", summaryModel.Trim());
+
+            if (body.SummaryPrompt is { } summaryPrompt && !string.IsNullOrWhiteSpace(summaryPrompt))
+                await UpsertAsync(db, "SummaryPrompt", summaryPrompt.Trim());
 
             await db.SaveChangesAsync();
             return Results.NoContent();

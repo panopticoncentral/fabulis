@@ -15,6 +15,8 @@ struct SettingsView: View {
     @State private var isSavingKokoroUrl = false
     @State private var kokoroUrlJustSaved = false
     @State private var speedDraft: Double = 1.0
+    @State private var summaryPromptDraft: String = ""
+    @State private var summaryPromptJustSaved = false
 
     private let autoLockOptions: [(label: String, value: String)] = [
         ("1 minute", "1"), ("5 minutes", "5"), ("15 minutes", "15"),
@@ -117,6 +119,35 @@ struct SettingsView: View {
                 NavigationLink("Edit storyteller", destination: StorytellerEditorView())
             }
 
+            Section("Story summaries") {
+                if let settings, let current = settings.summaryModel {
+                    Text(current).font(.callout.monospaced()).foregroundStyle(.secondary)
+                }
+                NavigationLink {
+                    ModelPickerView(currentModel: settings?.summaryModel) { picked in
+                        Task { await saveSummaryModel(picked) }
+                    }
+                } label: {
+                    Text(settings?.summaryModel == nil ? "Choose summary model (defaults to assistant model)" : "Change summary model")
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Summary prompt").font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $summaryPromptDraft)
+                        .frame(minHeight: 120)
+                        .font(.callout)
+                }
+                Button {
+                    Task { await saveSummaryPrompt() }
+                } label: {
+                    Text("Save prompt")
+                }
+                .disabled(summaryPromptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if summaryPromptJustSaved {
+                    Text("Summary prompt saved.").font(.caption).foregroundStyle(.green)
+                }
+            }
+
             Section("Auto-lock") {
                 if let settings {
                     Picker("After", selection: Binding(
@@ -156,6 +187,7 @@ struct SettingsView: View {
             serverURL = (try? await KeychainService.shared.loadServerURL()) ?? ""
             settings = try await FabulisAPIClient.shared.settings()
             if let settings { speedDraft = settings.narrationSpeed }
+            if let settings { summaryPromptDraft = settings.summaryPrompt }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -180,6 +212,28 @@ struct SettingsView: View {
         do {
             try await FabulisAPIClient.shared.updateSettings(assistantModel: model)
             settings = try await FabulisAPIClient.shared.settings()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveSummaryModel(_ model: String) async {
+        do {
+            try await FabulisAPIClient.shared.updateSettings(summaryModel: model)
+            settings = try await FabulisAPIClient.shared.settings()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func saveSummaryPrompt() async {
+        let trimmed = summaryPromptDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            try await FabulisAPIClient.shared.updateSettings(summaryPrompt: trimmed)
+            settings = try await FabulisAPIClient.shared.settings()
+            summaryPromptJustSaved = true
+            Task { try? await Task.sleep(for: .seconds(3)); summaryPromptJustSaved = false }
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -191,6 +191,19 @@ actor FabulisAPIClient {
         try await request("GET", path: "/stories/\(storyId)/versions/\(version)", authed: true)
     }
 
+    func storySummary(id: Int) async throws -> StorySummaryDetail {
+        try await request("GET", path: "/stories/\(id)/summary", authed: true)
+    }
+
+    func updateStorySummary(id: Int, text: String) async throws -> StorySummaryDetail {
+        struct Body: Encodable { let text: String }
+        return try await request("PUT", path: "/stories/\(id)/summary", body: Body(text: text), authed: true)
+    }
+
+    func regenerateStorySummary(id: Int) async throws {
+        try await requestVoid("POST", path: "/stories/\(id)/summary/regenerate", authed: true)
+    }
+
     func listDrafts() async throws -> [DraftSummary] {
         try await request("GET", path: "/drafts", authed: true)
     }
@@ -287,7 +300,9 @@ actor FabulisAPIClient {
         autoLockSelection: String? = nil,
         kokoroBaseUrl: String? = nil,
         narrationVoice: String? = nil,
-        narrationSpeed: Double? = nil
+        narrationSpeed: Double? = nil,
+        summaryModel: String? = nil,
+        summaryPrompt: String? = nil
     ) async throws {
         struct Body: Encodable {
             let apiKey: String?
@@ -296,6 +311,8 @@ actor FabulisAPIClient {
             let kokoroBaseUrl: String?
             let narrationVoice: String?
             let narrationSpeed: Double?
+            let summaryModel: String?
+            let summaryPrompt: String?
         }
         try await requestVoid(
             "PUT",
@@ -306,7 +323,9 @@ actor FabulisAPIClient {
                 autoLockSelection: autoLockSelection,
                 kokoroBaseUrl: kokoroBaseUrl,
                 narrationVoice: narrationVoice,
-                narrationSpeed: narrationSpeed),
+                narrationSpeed: narrationSpeed,
+                summaryModel: summaryModel,
+                summaryPrompt: summaryPrompt),
             authed: true)
     }
 

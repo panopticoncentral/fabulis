@@ -30,6 +30,8 @@ builder.Services.AddSingleton<NarrationTokenStore>();
 builder.Services.AddScoped<DraftService>();
 builder.Services.AddScoped<PromptService>();
 builder.Services.AddSingleton<GenerationManager>();
+builder.Services.AddSingleton<SummaryService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SummaryService>());
 
 var app = builder.Build();
 

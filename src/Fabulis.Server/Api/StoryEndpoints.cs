@@ -60,6 +60,68 @@ public static class StoryEndpoints
             return Results.Ok(dto);
         });
 
+        group.MapGet("/{id:int}/summary", async (
+            int id, FabulisDbContext db, SummaryService summaries) =>
+        {
+            var story = await db.Stories
+                .Include(s => s.Versions)
+                .FirstOrDefaultAsync(s => s.Id == id);
+            if (story is null) return Results.NotFound();
+
+            return Results.Ok(ToSummaryDto(story, summaries));
+        });
+
+        group.MapPut("/{id:int}/summary", async (
+            int id, UpdateSummaryRequest body, FabulisDbContext db, SummaryService summaries) =>
+        {
+            var story = await db.Stories
+                .Include(s => s.Versions)
+                .FirstOrDefaultAsync(s => s.Id == id);
+            if (story is null) return Results.NotFound();
+
+            var latest = story.Versions.Count > 0 ? story.Versions.Max(v => v.VersionNumber) : 0;
+            story.SummaryText = body.Text.Trim();
+            story.SummarizedThroughVersion = latest;
+            story.SummaryStatus = SummaryStatus.Ready;
+            story.SummaryError = null;
+            story.SummaryUpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            return Results.Ok(ToSummaryDto(story, summaries));
+        });
+
+        group.MapPost("/{id:int}/summary/regenerate", async (
+            int id, FabulisDbContext db, SummaryService summaries) =>
+        {
+            var exists = await db.Stories.AnyAsync(s => s.Id == id);
+            if (!exists) return Results.NotFound();
+
+            summaries.EnqueueRebuild(id);
+            return Results.Accepted();
+        });
+
         return routes;
+    }
+
+    private static SummaryDto ToSummaryDto(Story story, SummaryService summaries)
+    {
+        var latest = story.Versions.Count > 0 ? story.Versions.Max(v => v.VersionNumber) : 0;
+        var status = summaries.IsGenerating(story.Id)
+            ? "generating"
+            : story.SummaryStatus switch
+            {
+                SummaryStatus.Ready => "ready",
+                SummaryStatus.Failed => "failed",
+                _ => "none",
+            };
+
+        return new SummaryDto(
+            Text: story.SummaryText,
+            Status: status,
+            SummarizedThroughVersion: story.SummarizedThroughVersion,
+            LatestVersion: latest,
+            IsStale: StorySummary.NeedsWork(story.SummarizedThroughVersion, latest),
+            UpdatedAt: story.SummaryUpdatedAt,
+            Error: story.SummaryError);
     }
 }
