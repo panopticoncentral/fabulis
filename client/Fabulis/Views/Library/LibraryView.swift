@@ -284,12 +284,31 @@ struct LibraryView: View {
     }
 }
 
+// Full value equality (not id-only): SwiftUI compares a row view's stored
+// properties via Equatable to decide whether to re-render. An id-only `==`
+// makes a reloaded summary with a changed count look unchanged, so the
+// sidebar count goes stale. The hash stays id-based — equal values share an
+// id, so this remains consistent with `==`.
 extension CategorySummary: Hashable {
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    public static func == (lhs: CategorySummary, rhs: CategorySummary) -> Bool { lhs.id == rhs.id }
+    public static func == (lhs: CategorySummary, rhs: CategorySummary) -> Bool {
+        lhs.id == rhs.id
+            && lhs.name == rhs.name
+            && lhs.createdAt == rhs.createdAt
+            && lhs.storyCount == rhs.storyCount
+            && lhs.latestStoryTitle == rhs.latestStoryTitle
+            && lhs.promptCount == rhs.promptCount
+            && lhs.latestPromptTitle == rhs.latestPromptTitle
+    }
 }
 
 extension DraftSummary: Hashable {
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    public static func == (lhs: DraftSummary, rhs: DraftSummary) -> Bool { lhs.id == rhs.id }
+    public static func == (lhs: DraftSummary, rhs: DraftSummary) -> Bool {
+        lhs.id == rhs.id
+            && lhs.title == rhs.title
+            && lhs.createdAt == rhs.createdAt
+            && lhs.updatedAt == rhs.updatedAt
+            && lhs.messageCount == rhs.messageCount
+    }
 }
