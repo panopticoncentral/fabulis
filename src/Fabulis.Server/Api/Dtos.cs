@@ -17,7 +17,9 @@ public sealed record CategorySummaryDto(
     int StoryCount,
     string? LatestStoryTitle,
     int PromptCount,
-    string? LatestPromptTitle);
+    string? LatestPromptTitle,
+    int OneLinerCount,
+    string? LatestOneLinerText);
 
 public sealed record CategoryDto(
     int Id,
@@ -103,6 +105,30 @@ public sealed record UpdatePromptRequest(
     string Title,
     int CategoryId,
     IReadOnlyList<string> Messages);
+
+// ---------- one-liners ----------
+public sealed record OneLinerSummaryDto(
+    int Id,
+    string Text,
+    DateTime CreatedAt);
+
+public sealed record OneLinerCategoryDto(
+    int Id,
+    string Name,
+    DateTime CreatedAt,
+    IReadOnlyList<OneLinerSummaryDto> OneLiners);
+
+public sealed record OneLinerDto(
+    int Id,
+    int CategoryId,
+    string CategoryName,
+    string Text,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record CreateOneLinerRequest(int CategoryId, string Text);
+
+public sealed record UpdateOneLinerRequest(string Text, int CategoryId);
 
 // ---------- settings ----------
 public sealed record SettingsDto(

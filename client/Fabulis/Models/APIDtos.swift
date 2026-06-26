@@ -22,6 +22,8 @@ struct CategorySummary: Decodable, Identifiable, Sendable {
     let latestStoryTitle: String?
     let promptCount: Int
     let latestPromptTitle: String?
+    let oneLinerCount: Int
+    let latestOneLinerText: String?
 }
 
 struct CategoryDetail: Decodable, Identifiable, Sendable {
@@ -126,6 +128,40 @@ struct UpdatePromptRequest: Encodable, Sendable {
     let title: String
     let categoryId: Int
     let messages: [String]
+}
+
+// MARK: - One-liners
+
+struct OneLinerSummary: Decodable, Identifiable, Sendable {
+    let id: Int
+    let text: String
+    let createdAt: Date
+}
+
+struct OneLinerCategoryDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let name: String
+    let createdAt: Date
+    let oneLiners: [OneLinerSummary]
+}
+
+struct OneLinerDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let categoryId: Int
+    let categoryName: String
+    let text: String
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct CreateOneLinerRequest: Encodable, Sendable {
+    let categoryId: Int
+    let text: String
+}
+
+struct UpdateOneLinerRequest: Encodable, Sendable {
+    let text: String
+    let categoryId: Int
 }
 
 struct SettingsDto: Decodable, Sendable {

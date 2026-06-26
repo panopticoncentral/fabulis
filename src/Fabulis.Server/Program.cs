@@ -29,6 +29,7 @@ builder.Services.AddSingleton<KokoroService>();
 builder.Services.AddSingleton<NarrationTokenStore>();
 builder.Services.AddScoped<DraftService>();
 builder.Services.AddScoped<PromptService>();
+builder.Services.AddScoped<OneLinerService>();
 builder.Services.AddSingleton<GenerationManager>();
 builder.Services.AddSingleton<SummaryService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SummaryService>());
@@ -56,6 +57,7 @@ api.MapSettingsEndpoints();
 api.MapStorytellerEndpoints();
 api.MapDraftEndpoints();
 api.MapPromptEndpoints();
+api.MapOneLinerEndpoints();
 api.MapModelEndpoints();
 api.MapNarrationEndpoints();
 

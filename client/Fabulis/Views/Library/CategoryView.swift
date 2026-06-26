@@ -68,7 +68,7 @@ struct CategoryView: View {
                     Button("Delete", role: .destructive) { Task { await deleteCategory() } }
                },
                message: {
-                    Text("This deletes the category and all its stories and prompts. This cannot be undone.")
+                    Text("This deletes the category and all its stories, prompts, and one-liners. This cannot be undone.")
                })
         .task { await load() }
         .refreshable { await load() }

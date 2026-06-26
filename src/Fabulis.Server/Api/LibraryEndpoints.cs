@@ -15,6 +15,7 @@ public static class LibraryEndpoints
             var categories = await db.Categories
                 .Include(c => c.Stories)
                 .Include(c => c.Prompts)
+                .Include(c => c.OneLiners)
                 .OrderBy(c => c.Name)
                 .ToListAsync();
 
@@ -26,7 +27,9 @@ public static class LibraryEndpoints
                     c.Stories.Count,
                     c.Stories.OrderByDescending(s => s.CreatedAt).FirstOrDefault()?.Title,
                     c.Prompts.Count,
-                    c.Prompts.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Title))
+                    c.Prompts.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Title,
+                    c.OneLiners.Count,
+                    c.OneLiners.OrderByDescending(o => o.CreatedAt).FirstOrDefault()?.Text))
                 .ToList());
 
             return Results.Ok(dto);
@@ -72,6 +75,24 @@ public static class LibraryEndpoints
             return Results.Ok(dto);
         });
 
+        group.MapGet("/categories/{id:int}/one-liners", async (int id, OneLinerService oneLiners) =>
+        {
+            var category = await oneLiners.GetCategoryWithOneLinersAsync(id);
+            if (category is null)
+                return Results.NotFound();
+
+            var dto = new OneLinerCategoryDto(
+                category.Id,
+                category.Name,
+                category.CreatedAt,
+                category.OneLiners
+                    .OrderByDescending(o => o.CreatedAt)
+                    .Select(o => new OneLinerSummaryDto(o.Id, o.Text, o.CreatedAt))
+                    .ToList());
+
+            return Results.Ok(dto);
+        });
+
         group.MapPost("/categories", async (CreateCategoryRequest body, FabulisDbContext db) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name))
@@ -79,7 +100,7 @@ public static class LibraryEndpoints
             var cat = new Category { Name = body.Name.Trim(), CreatedAt = DateTime.UtcNow };
             db.Categories.Add(cat);
             await db.SaveChangesAsync();
-            return Results.Ok(new CategorySummaryDto(cat.Id, cat.Name, cat.CreatedAt, 0, null, 0, null));
+            return Results.Ok(new CategorySummaryDto(cat.Id, cat.Name, cat.CreatedAt, 0, null, 0, null, 0, null));
         });
 
         group.MapPut("/categories/{id:int}", async (int id, RenameCategoryRequest body, FabulisDbContext db) =>

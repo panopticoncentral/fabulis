@@ -17,6 +17,8 @@ struct CategoryRow: View {
         switch kind {
         case .prompts:
             "\(category.promptCount) \(category.promptCount == 1 ? "prompt" : "prompts")"
+        case .oneLiners:
+            "\(category.oneLinerCount) \(category.oneLinerCount == 1 ? "one-liner" : "one-liners")"
         default:
             "\(category.storyCount) \(category.storyCount == 1 ? "story" : "stories")"
         }

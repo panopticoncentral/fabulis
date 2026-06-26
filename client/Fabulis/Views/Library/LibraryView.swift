@@ -44,7 +44,7 @@ struct LibraryView: View {
                             }
                        },
                        message: { _ in
-                            Text("This deletes the category and all its stories and prompts. This cannot be undone.")
+                            Text("This deletes the category and all its stories, prompts, and one-liners. This cannot be undone.")
                        })
                 .alert("Delete draft?",
                        isPresented: Binding(
@@ -82,7 +82,7 @@ struct LibraryView: View {
                     }
                 }
                 .disabled(creatingDraft)
-            case .stories, .prompts:
+            case .stories, .prompts, .oneLiners:
                 Button { showingNewCategorySheet = true } label: {
                     Label("New Category", systemImage: "folder.badge.plus")
                 }
@@ -126,7 +126,7 @@ struct LibraryView: View {
         } else {
             switch selectedKind {
             case .drafts: draftsList
-            case .stories, .prompts: categoriesList
+            case .stories, .prompts, .oneLiners: categoriesList
             }
         }
     }
@@ -206,7 +206,8 @@ struct LibraryView: View {
             }
         case .category(let id, let name):
             NavigationStack {
-                if selectedKind == .prompts {
+                switch selectedKind {
+                case .prompts:
                     PromptCategoryView(categoryId: id, categoryName: name, onChanged: {
                         Task { await load() }
                     }, onDeleted: {
@@ -214,7 +215,15 @@ struct LibraryView: View {
                         Task { await load() }
                     })
                     .id(id)
-                } else {
+                case .oneLiners:
+                    OneLinerCategoryView(categoryId: id, categoryName: name, onChanged: {
+                        Task { await load() }
+                    }, onDeleted: {
+                        selection = nil
+                        Task { await load() }
+                    })
+                    .id(id)
+                default:
                     CategoryView(categoryId: id, categoryName: name, onDeleted: {
                         selection = nil
                         Task { await load() }
@@ -299,6 +308,8 @@ extension CategorySummary: Hashable {
             && lhs.latestStoryTitle == rhs.latestStoryTitle
             && lhs.promptCount == rhs.promptCount
             && lhs.latestPromptTitle == rhs.latestPromptTitle
+            && lhs.oneLinerCount == rhs.oneLinerCount
+            && lhs.latestOneLinerText == rhs.latestOneLinerText
     }
 }
 

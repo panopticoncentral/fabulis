@@ -183,6 +183,24 @@ actor FabulisAPIClient {
         try await requestVoid("DELETE", path: "/prompts/\(id)", authed: true)
     }
 
+    func categoryOneLiners(categoryId: Int) async throws -> OneLinerCategoryDetail {
+        try await request("GET", path: "/categories/\(categoryId)/one-liners", authed: true)
+    }
+
+    func createOneLiner(categoryId: Int, text: String) async throws -> OneLinerDetail {
+        let body = CreateOneLinerRequest(categoryId: categoryId, text: text)
+        return try await request("POST", path: "/one-liners", body: body, authed: true)
+    }
+
+    func updateOneLiner(id: Int, text: String, categoryId: Int) async throws -> OneLinerDetail {
+        let body = UpdateOneLinerRequest(text: text, categoryId: categoryId)
+        return try await request("PUT", path: "/one-liners/\(id)", body: body, authed: true)
+    }
+
+    func deleteOneLiner(id: Int) async throws {
+        try await requestVoid("DELETE", path: "/one-liners/\(id)", authed: true)
+    }
+
     func story(id: Int) async throws -> StoryDetail {
         try await request("GET", path: "/stories/\(id)", authed: true)
     }
