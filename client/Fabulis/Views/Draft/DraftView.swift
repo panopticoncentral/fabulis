@@ -30,7 +30,10 @@ struct DraftView: View {
     /// streaming chunks don't drag them back; scrolling near the bottom
     /// re-snaps to the .bottom edge so rotation re-anchors there.
     @State private var scrollPosition = ScrollPosition()
-    @FocusState private var promptFocused: Bool
+    // A plain @State Bool, not @FocusState: the prompt field is now a UIKit-
+    // backed PromptComposer (it intercepts Return on Mac Catalyst), which
+    // tracks focus through this binding instead of SwiftUI's focus system.
+    @State private var promptFocused = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -135,29 +138,13 @@ struct DraftView: View {
                 .foregroundStyle(.secondary)
             }
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("Prompt", text: $prompt, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...5)
-                    .focused($promptFocused)
-                    .disabled(isStreaming && editingMessage == nil)
-                    .background {
-                        // SwiftUI's onKeyPress/onSubmit don't intercept Return
-                        // inside a focused multiline TextField on Mac Catalyst —
-                        // the backing text view inserts a newline before they
-                        // fire. An invisible button bound to the Return shortcut
-                        // fires reliably across Catalyst and iPad hardware
-                        // keyboards. Shift+Return doesn't match the (empty)
-                        // modifier set, so it falls through to the field and
-                        // inserts a newline as expected.
-                        Button(action: handleReturn) { EmptyView() }
-                            .keyboardShortcut(.return, modifiers: [])
-                            .opacity(0)
-                    }
-                    .onKeyPress(.escape) {
-                        guard editingMessage != nil else { return .ignored }
-                        cancelEdit()
-                        return .handled
-                    }
+                PromptComposer(
+                    text: $prompt,
+                    isFocused: $promptFocused,
+                    isEditable: !(isStreaming && editingMessage == nil),
+                    onReturn: handleReturn,
+                    handlesEscape: editingMessage != nil,
+                    onEscape: cancelEdit)
                 if editingMessage == nil {
                     sendButton
                 } else {
