@@ -12,9 +12,11 @@ import UIKit
 ///
 /// The fix lives one layer down: a `UITextView` subclass exposes a Return
 /// `UIKeyCommand` with `wantsPriorityOverSystemBehavior = true`, which pre-empts
-/// the newline insert and fires `onReturn` instead. Shift+Return carries a
-/// different modifier set, doesn't match the (empty-modifier) command, and so
-/// falls through to the text view to insert a newline as expected.
+/// the newline insert and fires `onReturn` instead. A second command claims
+/// Shift+Return and inserts a newline itself — `UIKeyCommand` doesn't
+/// distinguish Shift on a character key like Return on its own, so without that
+/// explicit command Shift+Return would match the plain-Return command and
+/// submit too.
 struct PromptComposer: View {
     @Binding var text: String
     @Binding var isFocused: Bool
@@ -171,7 +173,8 @@ struct SubmittableTextView: UIViewRepresentable {
 
 /// `UITextView` that intercepts Return (no modifiers) and Escape via key
 /// commands. The Return command sets `wantsPriorityOverSystemBehavior` so it
-/// wins against the field editor's default newline insert on Mac Catalyst.
+/// wins against the field editor's default newline insert on Mac Catalyst; a
+/// separate Shift+Return command inserts the newline that Return now suppresses.
 final class ReturnInterceptingTextView: UITextView {
     var onReturn: (() -> Void)?
     var onEscape: (() -> Void)?
@@ -181,10 +184,22 @@ final class ReturnInterceptingTextView: UITextView {
     weak var placeholderLabel: UILabel?
 
     override var keyCommands: [UIKeyCommand]? {
+        // Shift+Return must insert a newline, not submit. UIKeyCommand doesn't
+        // distinguish Shift on a character key like Return on its own —
+        // Shift+Return delivers the same "\r" input — so without an explicit
+        // command claiming it, Shift+Return matches the plain-Return command
+        // below and submits. Give it its own command that inserts the newline
+        // itself; priority keeps the field editor from adding a second one.
+        // Listed first so it wins the match for the Shift+Return event.
+        let shiftReturnCommand = UIKeyCommand(
+            input: "\r", modifierFlags: .shift, action: #selector(handleShiftReturnCommand))
+        shiftReturnCommand.wantsPriorityOverSystemBehavior = true
+
         let returnCommand = UIKeyCommand(
             input: "\r", modifierFlags: [], action: #selector(handleReturnCommand))
         returnCommand.wantsPriorityOverSystemBehavior = true
-        var commands = [returnCommand]
+
+        var commands = [shiftReturnCommand, returnCommand]
         if handlesEscape {
             commands.append(UIKeyCommand(
                 input: UIKeyCommand.inputEscape,
@@ -195,6 +210,10 @@ final class ReturnInterceptingTextView: UITextView {
     }
 
     @objc private func handleReturnCommand() { onReturn?() }
+    @objc private func handleShiftReturnCommand() {
+        guard isEditable else { return }
+        insertText("\n")
+    }
     @objc private func handleEscapeCommand() { onEscape?() }
 
     override func layoutSubviews() {
