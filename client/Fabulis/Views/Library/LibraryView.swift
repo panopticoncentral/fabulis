@@ -138,23 +138,25 @@ struct LibraryView: View {
                 description: Text("Tap \u{201C}New Draft\u{201D} to start a story."))
         } else {
             List(selection: $selection) {
-                ForEach(drafts) { draft in
-                    DraftRow(draft: draft)
-                        .tag(LibrarySelection.draft(id: draft.id))
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                draftPendingDeletion = draft
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                Section("\(drafts.count) Draft\(drafts.count == 1 ? "" : "s")") {
+                    ForEach(drafts) { draft in
+                        DraftRow(draft: draft)
+                            .tag(LibrarySelection.draft(id: draft.id))
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    draftPendingDeletion = draft
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
                             }
-                        }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                draftPendingDeletion = draft
-                            } label: {
-                                Label("Delete Draft", systemImage: "trash")
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    draftPendingDeletion = draft
+                                } label: {
+                                    Label("Delete Draft", systemImage: "trash")
+                                }
                             }
-                        }
+                    }
                 }
             }
         }
