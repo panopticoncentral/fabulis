@@ -41,7 +41,13 @@ actor KeychainService {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            // AfterFirstUnlock (not WhenUnlocked) so the item stays readable
+            // after the screen later locks / the device sleeps. WhenUnlocked
+            // made loadServerURL() throw errSecInteractionNotAllowed when the
+            // app re-activated from a long idle, which bootstrap() mistook for
+            // "no server configured" and sent the user to onboarding. Still
+            // ThisDeviceOnly: never backed up or migrated to another device.
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         let status = SecItemAdd(attrs as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.unknown(status) }

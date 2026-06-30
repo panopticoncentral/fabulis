@@ -18,9 +18,21 @@ final class AppState {
     private let api = FabulisAPIClient.shared
 
     func bootstrap() async {
-        let savedURL = (try? await keychain.loadServerURL()) ?? nil
+        let savedURL: String?
         do {
-            guard savedURL != nil, (try await keychain.loadSessionToken()) != nil else {
+            savedURL = try await keychain.loadServerURL()
+        } catch {
+            // A *thrown* Keychain error means the item is temporarily
+            // unreadable — e.g. the device just woke and the keychain isn't
+            // accessible yet — NOT that no server is configured. Treating it as
+            // the latter would wrongly drop the user back to onboarding and
+            // "forget" their server. Surface it as a retryable state instead;
+            // `loadServerURL()` returns nil (not throws) when truly absent.
+            phase = .unreachable(serverURL: "", message: error.localizedDescription)
+            return
+        }
+        do {
+            guard let savedURL, (try await keychain.loadSessionToken()) != nil else {
                 phase = (savedURL == nil) ? .needsOnboarding : .needsAuth
                 return
             }
