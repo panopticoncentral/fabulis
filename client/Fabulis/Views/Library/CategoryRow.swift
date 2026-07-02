@@ -19,6 +19,8 @@ struct CategoryRow: View {
             "\(category.promptCount) \(category.promptCount == 1 ? "prompt" : "prompts")"
         case .oneLiners:
             "\(category.oneLinerCount) \(category.oneLinerCount == 1 ? "one-liner" : "one-liners")"
+        case .tropes:
+            "\(category.tropeCount) \(category.tropeCount == 1 ? "trope" : "tropes")"
         default:
             "\(category.storyCount) \(category.storyCount == 1 ? "story" : "stories")"
         }

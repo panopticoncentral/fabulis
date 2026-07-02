@@ -24,6 +24,8 @@ struct CategorySummary: Decodable, Identifiable, Sendable {
     let latestPromptTitle: String?
     let oneLinerCount: Int
     let latestOneLinerText: String?
+    let tropeCount: Int
+    let latestTropeText: String?
 }
 
 struct CategoryDetail: Decodable, Identifiable, Sendable {
@@ -160,6 +162,40 @@ struct CreateOneLinerRequest: Encodable, Sendable {
 }
 
 struct UpdateOneLinerRequest: Encodable, Sendable {
+    let text: String
+    let categoryId: Int
+}
+
+// MARK: - Tropes
+
+struct TropeSummary: Decodable, Identifiable, Sendable {
+    let id: Int
+    let text: String
+    let createdAt: Date
+}
+
+struct TropeCategoryDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let name: String
+    let createdAt: Date
+    let tropes: [TropeSummary]
+}
+
+struct TropeDetail: Decodable, Identifiable, Sendable {
+    let id: Int
+    let categoryId: Int
+    let categoryName: String
+    let text: String
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct CreateTropeRequest: Encodable, Sendable {
+    let categoryId: Int
+    let text: String
+}
+
+struct UpdateTropeRequest: Encodable, Sendable {
     let text: String
     let categoryId: Int
 }

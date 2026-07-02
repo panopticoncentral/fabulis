@@ -5,6 +5,7 @@ import Foundation
 enum LibraryKind: String, CaseIterable, Identifiable {
     case prompts
     case oneLiners
+    case tropes
     case drafts
     case stories
 
@@ -16,18 +17,20 @@ enum LibraryKind: String, CaseIterable, Identifiable {
         case .stories: "Stories"
         case .prompts: "Prompts"
         case .oneLiners: "One-liners"
+        case .tropes: "Tropes"
         }
     }
 
     /// Whether this kind organizes its items under the shared category
-    /// taxonomy. Drafts are a flat list; stories, prompts, and one-liners are
-    /// grouped by category.
+    /// taxonomy. Drafts are a flat list; stories, prompts, one-liners, and
+    /// tropes are grouped by category.
     var hasCategories: Bool {
         switch self {
         case .drafts: false
         case .stories: true
         case .prompts: true
         case .oneLiners: true
+        case .tropes: true
         }
     }
 }

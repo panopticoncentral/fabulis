@@ -44,7 +44,7 @@ struct LibraryView: View {
                             }
                        },
                        message: { _ in
-                            Text("This deletes the category and all its stories, prompts, and one-liners. This cannot be undone.")
+                            Text("This deletes the category and all its stories, prompts, one-liners, and tropes. This cannot be undone.")
                        })
                 .alert("Delete draft?",
                        isPresented: Binding(
@@ -82,7 +82,7 @@ struct LibraryView: View {
                     }
                 }
                 .disabled(creatingDraft)
-            case .stories, .prompts, .oneLiners:
+            case .stories, .prompts, .oneLiners, .tropes:
                 Button { showingNewCategorySheet = true } label: {
                     Label("New Category", systemImage: "folder.badge.plus")
                 }
@@ -126,7 +126,7 @@ struct LibraryView: View {
         } else {
             switch selectedKind {
             case .drafts: draftsList
-            case .stories, .prompts, .oneLiners: categoriesList
+            case .stories, .prompts, .oneLiners, .tropes: categoriesList
             }
         }
     }
@@ -225,6 +225,14 @@ struct LibraryView: View {
                         Task { await load() }
                     })
                     .id(id)
+                case .tropes:
+                    TropeCategoryView(categoryId: id, categoryName: name, onChanged: {
+                        Task { await load() }
+                    }, onDeleted: {
+                        selection = nil
+                        Task { await load() }
+                    })
+                    .id(id)
                 default:
                     CategoryView(categoryId: id, categoryName: name, onDeleted: {
                         selection = nil
@@ -312,6 +320,8 @@ extension CategorySummary: Hashable {
             && lhs.latestPromptTitle == rhs.latestPromptTitle
             && lhs.oneLinerCount == rhs.oneLinerCount
             && lhs.latestOneLinerText == rhs.latestOneLinerText
+            && lhs.tropeCount == rhs.tropeCount
+            && lhs.latestTropeText == rhs.latestTropeText
     }
 }
 

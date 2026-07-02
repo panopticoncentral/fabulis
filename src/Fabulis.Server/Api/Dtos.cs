@@ -19,7 +19,9 @@ public sealed record CategorySummaryDto(
     int PromptCount,
     string? LatestPromptTitle,
     int OneLinerCount,
-    string? LatestOneLinerText);
+    string? LatestOneLinerText,
+    int TropeCount,
+    string? LatestTropeText);
 
 public sealed record CategoryDto(
     int Id,
@@ -129,6 +131,30 @@ public sealed record OneLinerDto(
 public sealed record CreateOneLinerRequest(int CategoryId, string Text);
 
 public sealed record UpdateOneLinerRequest(string Text, int CategoryId);
+
+// ---------- tropes ----------
+public sealed record TropeSummaryDto(
+    int Id,
+    string Text,
+    DateTime CreatedAt);
+
+public sealed record TropeCategoryDto(
+    int Id,
+    string Name,
+    DateTime CreatedAt,
+    IReadOnlyList<TropeSummaryDto> Tropes);
+
+public sealed record TropeDto(
+    int Id,
+    int CategoryId,
+    string CategoryName,
+    string Text,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+public sealed record CreateTropeRequest(int CategoryId, string Text);
+
+public sealed record UpdateTropeRequest(string Text, int CategoryId);
 
 // ---------- settings ----------
 public sealed record SettingsDto(

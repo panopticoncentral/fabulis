@@ -9,4 +9,5 @@ public class Category
     public List<Story> Stories { get; set; } = [];
     public List<Prompt> Prompts { get; set; } = [];
     public List<OneLiner> OneLiners { get; set; } = [];
+    public List<Trope> Tropes { get; set; } = [];
 }
