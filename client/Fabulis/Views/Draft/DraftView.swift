@@ -22,6 +22,8 @@ struct DraftView: View {
     @State private var editingMessage: DraftMessageDto?
     @State private var stashedPrompt: String?
     @State private var narrationAvailable = false
+    @State private var messagePendingDeletion: DraftMessageDto?
+    @State private var messagePendingRegenerate: DraftMessageDto?
     @State private var player = NarrationPlayer()
     /// Starts unset. `loadDraft` flips it to the .bottom edge once messages
     /// arrive — initializing with .bottom directly is a no-op (the ScrollView
@@ -66,13 +68,16 @@ struct DraftView: View {
                                     }
                                     if msg.role == .prompt, msg.id >= 0 {
                                         Button {
-                                            Task { await editAndResubmit(messageId: msg.id, content: msg.content) }
+                                            requestRegenerate(msg)
                                         } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
+                                            .disabled(isStreaming)
                                     }
-                                    Divider()
-                                    Button(role: .destructive) {
-                                        Task { await deleteMessage(msg.id) }
-                                    } label: { Label("Delete and after", systemImage: "trash") }
+                                    if msg.id >= 0 {
+                                        Divider()
+                                        Button(role: .destructive) {
+                                            messagePendingDeletion = msg
+                                        } label: { Label("Delete and after", systemImage: "trash") }
+                                    }
                                 }
                                 .id(msg.id)
                             }
@@ -84,11 +89,12 @@ struct DraftView: View {
                         if isStreaming {
                             DraftMessageView(streamingResponse: streamingContent)
                         }
-                        if let errorMessage {
-                            Text(errorMessage).foregroundStyle(.red).padding(.top, 8)
-                        }
                     }
                     .padding()
+                    // Cap the reading column and center it: unconstrained bubbles
+                    // produce very long lines in a wide Mac/iPad window.
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
                 }
                 .scrollPosition($scrollPosition, anchor: .bottom)
                 .onChange(of: player.currentBubbleId) { _, new in
@@ -96,16 +102,50 @@ struct DraftView: View {
                         withAnimation { proxy.scrollTo(new, anchor: .center) }
                     }
                 }
+                .overlay { draftPlaceholder }
             }
 
+            if let errorMessage {
+                errorBanner(errorMessage)
+            }
             Divider()
             inputBar
         }
         .navigationTitle(draft?.title ?? "New Draft")
+        .alert("Delete message?",
+               isPresented: Binding(
+                    get: { messagePendingDeletion != nil },
+                    set: { if !$0 { messagePendingDeletion = nil } }),
+               presenting: messagePendingDeletion,
+               actions: { msg in
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        Task { await deleteMessage(msg.id) }
+                    }
+               },
+               message: { msg in
+                    Text(deleteMessageWarning(for: msg))
+               })
+        .alert("Regenerate from here?",
+               isPresented: Binding(
+                    get: { messagePendingRegenerate != nil },
+                    set: { if !$0 { messagePendingRegenerate = nil } }),
+               presenting: messagePendingRegenerate,
+               actions: { msg in
+                    Button("Cancel", role: .cancel) {}
+                    Button("Regenerate", role: .destructive) {
+                        Task { await editAndResubmit(messageId: msg.id, content: msg.content) }
+                    }
+               },
+               message: { msg in
+                    Text(regenerateWarning(for: msg))
+               })
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") { showSaveSheet = true }
                     .disabled((draft?.messages.isEmpty ?? true) || isStreaming)
+                    .keyboardShortcut("s", modifiers: .command)
+                    .fixedSize()
             }
         }
         .sheet(isPresented: $showSaveSheet) {
@@ -122,6 +162,18 @@ struct DraftView: View {
             }
         }
         .task { await loadNarrationAvailability() }
+    }
+
+    /// Loading spinner while the draft is first fetched, and a starter empty
+    /// state for a brand-new draft with nothing generating yet.
+    @ViewBuilder
+    private var draftPlaceholder: some View {
+        if draft == nil && errorMessage == nil {
+            ProgressView()
+        } else if draft?.messages.isEmpty == true, inFlightPrompt == nil, !isStreaming {
+            ContentUnavailableView("Start your story", systemImage: "sparkles",
+                description: Text("Type a prompt below to begin."))
+        }
     }
 
     private var inputBar: some View {
@@ -175,6 +227,57 @@ struct DraftView: View {
         .buttonStyle(.borderedProminent)
         .tint(isStreaming ? .red : .accentColor)
         .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .accessibilityLabel(isStreaming ? "Stop generating" : "Send")
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.callout)
+                .textSelection(.enabled)
+            Spacer(minLength: 8)
+            Button {
+                errorMessage = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss error")
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.12))
+    }
+
+    /// Routes context-menu Regenerate: it silently drops every message after the
+    /// prompt, so confirm first when there is anything to lose; otherwise run it
+    /// directly (regenerating the last prompt destroys nothing).
+    private func requestRegenerate(_ msg: DraftMessageDto) {
+        let after = DraftEditLogic.messagesAfter(draft?.messages ?? [], editingId: msg.id)
+        if after > 0 {
+            messagePendingRegenerate = msg
+        } else {
+            Task { await editAndResubmit(messageId: msg.id, content: msg.content) }
+        }
+    }
+
+    private func deleteMessageWarning(for msg: DraftMessageDto) -> String {
+        let after = DraftEditLogic.messagesAfter(draft?.messages ?? [], editingId: msg.id)
+        if after == 0 {
+            return "This deletes this message. This cannot be undone."
+        }
+        let noun = after == 1 ? "message" : "messages"
+        return "This deletes this message and the \(after) \(noun) after it. This cannot be undone."
+    }
+
+    private func regenerateWarning(for msg: DraftMessageDto) -> String {
+        let after = DraftEditLogic.messagesAfter(draft?.messages ?? [], editingId: msg.id)
+        let noun = after == 1 ? "message" : "messages"
+        return "This regenerates from this prompt and deletes the \(after) \(noun) after it. This cannot be undone."
     }
 
     @ViewBuilder
@@ -429,6 +532,11 @@ struct DraftView: View {
                 streamingContent = ""
                 isStreaming = false
                 notifyDraftChanged()
+                // Streaming content mutates silently for VoiceOver; announce the
+                // terminal state so it's perceivable without watching the screen.
+                if errorMessage == nil {
+                    AccessibilityNotification.Announcement("Response complete").post()
+                }
             }
         }
     }

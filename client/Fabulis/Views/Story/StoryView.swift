@@ -35,6 +35,10 @@ struct StoryView: View {
                                 }
                             }
                             .padding()
+                            // Cap the reading column and center it so long-form
+                            // prose doesn't stretch edge-to-edge on a wide window.
+                            .frame(maxWidth: 720)
+                            .frame(maxWidth: .infinity)
                         }
                         .onChange(of: player.currentBubbleId) { _, new in
                             if let new {
@@ -45,7 +49,7 @@ struct StoryView: View {
                 } else if isLoadingVersion {
                     ProgressView()
                 } else if let versionError {
-                    errorView("Couldn't load version", versionError) {
+                    LoadFailedView(title: "Couldn't load version", message: versionError) {
                         if let selectedVersion {
                             Task { await loadVersion(selectedVersion) }
                         }
@@ -54,7 +58,7 @@ struct StoryView: View {
             } else if isLoadingStory {
                 ProgressView()
             } else if let storyError {
-                errorView("Couldn't load story", storyError) {
+                LoadFailedView(title: "Couldn't load story", message: storyError) {
                     Task { await loadStory() }
                 }
             }
@@ -84,6 +88,23 @@ struct StoryView: View {
                     }
                 }
             }
+            if versionDetail != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share story")
+                    .disabled(shareText.isEmpty)
+                }
+            }
+            if detail != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { Task { await loadStory() } } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .keyboardShortcut("r", modifiers: .command)
+                }
+            }
             if detail != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -111,14 +132,13 @@ struct StoryView: View {
         .onDisappear { player.stop() }
     }
 
-    @ViewBuilder
-    private func errorView(_ headline: String, _ message: String, retry: @escaping () -> Void) -> some View {
-        VStack(spacing: 12) {
-            Text(headline).font(.headline)
-            Text(message).font(.caption).foregroundStyle(.secondary)
-            Button("Retry", action: retry)
-        }
-        .padding()
+    /// The current version's prose (response messages), for ShareLink/export.
+    private var shareText: String {
+        guard let versionDetail else { return "" }
+        return versionDetail.messages
+            .filter { $0.role == .response }
+            .map(\.content)
+            .joined(separator: "\n\n")
     }
 
     private func select(version: Int) {

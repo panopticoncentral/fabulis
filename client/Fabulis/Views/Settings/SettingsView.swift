@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.dismiss) private var dismiss
 
     @State private var serverURL: String = ""
     @State private var settings: SettingsDto?
@@ -49,7 +50,8 @@ struct SettingsView: View {
                     Text(current).font(.callout.monospaced()).foregroundStyle(.secondary)
                 }
                 NavigationLink {
-                    ModelPickerView(currentModel: settings?.assistantModel) { picked in
+                    ModelPickerView(title: "Assistant Model",
+                                    currentModel: settings?.assistantModel) { picked in
                         Task { await saveModel(picked) }
                     }
                 } label: {
@@ -102,7 +104,8 @@ struct SettingsView: View {
                     onEditingChanged: { editing in
                         if !editing { Task { await saveSpeed(speedDraft) } }
                     }
-                )
+                ) { Text("Narration speed") }
+                .accessibilityValue(String(format: "%.2f×", speedDraft))
 
                 if let settings, settings.kokoroBaseUrlIsSet, !settings.narrationAvailable {
                     if settings.narrationVoice == nil {
@@ -124,7 +127,8 @@ struct SettingsView: View {
                     Text(current).font(.callout.monospaced()).foregroundStyle(.secondary)
                 }
                 NavigationLink {
-                    ModelPickerView(currentModel: settings?.summaryModel) { picked in
+                    ModelPickerView(title: "Summary Model",
+                                    currentModel: settings?.summaryModel) { picked in
                         Task { await saveSummaryModel(picked) }
                     }
                 } label: {
@@ -178,7 +182,16 @@ struct SettingsView: View {
                 Section { Text(errorMessage).foregroundStyle(.red) }
             }
         }
+        // Block interaction until settings load so a stray slider drag or prompt
+        // edit can't persist a default over the real server value.
+        .disabled(isLoading)
+        .overlay { if isLoading { ProgressView().controlSize(.large) } }
         .navigationTitle("Settings")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }.fixedSize()
+            }
+        }
         .task { await load() }
     }
 

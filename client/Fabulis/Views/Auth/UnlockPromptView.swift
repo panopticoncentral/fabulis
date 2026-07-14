@@ -6,6 +6,7 @@ struct UnlockPromptView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     @State private var serverURL: String?
+    @State private var showingResetConfirm = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -17,12 +18,12 @@ struct UnlockPromptView: View {
                 Text("Locked").font(.title.bold())
                 if let serverURL { Text(serverURL).font(.callout).foregroundStyle(.secondary) }
                 SecureField("Vault password", text: $password)
-                    .textContentType(.oneTimeCode)
+                    .textContentType(.password)
+                    .submitLabel(.go)
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
-                    .padding(.horizontal)
                     .onSubmit {
-                        guard !password.isEmpty, !isSubmitting else { return }
+                        guard !password.isEmpty, !isSubmitting, serverURL != nil else { return }
                         Task { await submit() }
                     }
                 if let errorMessage {
@@ -34,16 +35,27 @@ struct UnlockPromptView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(password.isEmpty || isSubmitting)
-                .padding(.horizontal)
+                .disabled(password.isEmpty || isSubmitting || serverURL == nil)
                 Button("Use a different server") {
-                    Task { await appState.resetServer() }
+                    showingResetConfirm = true
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(isSubmitting)
             }
-            .padding(.top, 80)
+            .frame(maxWidth: 420)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+            .confirmationDialog("Disconnect from this server?",
+                                isPresented: $showingResetConfirm,
+                                titleVisibility: .visible) {
+                Button("Disconnect", role: .destructive) {
+                    Task { await appState.resetServer() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You'll need to re-enter the server URL and password to reconnect.")
+            }
             .task {
                 serverURL = try? await KeychainService.shared.loadServerURL()
                 focused = true
@@ -52,7 +64,10 @@ struct UnlockPromptView: View {
     }
 
     private func submit() async {
-        guard let url = serverURL else { return }
+        guard let url = serverURL else {
+            errorMessage = "No server configured. Choose \u{201C}Use a different server\u{201D} to set one."
+            return
+        }
         errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
@@ -61,6 +76,8 @@ struct UnlockPromptView: View {
             appState.didReauthenticate()
         } catch APIError.unauthorized {
             errorMessage = "Wrong password."
+            password = ""
+            focused = true
         } catch {
             errorMessage = error.localizedDescription
         }

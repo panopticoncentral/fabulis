@@ -19,8 +19,8 @@ struct NarrationVoicePickerView: View {
             if isLoading {
                 ProgressView()
             } else if let errorMessage {
-                ContentUnavailableView("Couldn't load voices", systemImage: "exclamationmark.triangle",
-                    description: Text(errorMessage))
+                LoadFailedView(title: "Couldn't load voices",
+                               message: errorMessage) { Task { await load() } }
             } else {
                 List {
                     ForEach(grouped, id: \.0) { language, items in
@@ -35,10 +35,13 @@ struct NarrationVoicePickerView: View {
                                         Spacer()
                                         if voice.id == currentVoice {
                                             Image(systemName: "checkmark")
-                                                .foregroundStyle(Color.accentColor)
+                                                .foregroundStyle(.tint)
+                                                .accessibilityHidden(true)
                                         }
                                     }
+                                    .contentShape(Rectangle())
                                 }
+                                .accessibilityAddTraits(voice.id == currentVoice ? [.isSelected] : [])
                             }
                         }
                     }

@@ -91,6 +91,14 @@ struct SubmittableTextView: UIViewRepresentable {
         view.isScrollEnabled = true
         view.layer.cornerRadius = 6
         view.layer.borderWidth = 1
+        view.refreshBorderColor()
+        // updateUIView isn't guaranteed to run on an appearance change, so let
+        // the view refresh its own CALayer border color when the trait flips.
+        view.registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+            (textView: ReturnInterceptingTextView, _) in
+            textView.refreshBorderColor()
+        }
+        view.accessibilityLabel = Self.placeholder
         view.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         // Placeholder, drawn inside the text container's content origin.
@@ -108,6 +116,7 @@ struct SubmittableTextView: UIViewRepresentable {
             placeholder.topAnchor.constraint(
                 equalTo: view.topAnchor, constant: Self.inset.top),
         ])
+        placeholder.isAccessibilityElement = false
         view.placeholderLabel = placeholder
 
         view.onReturn = onReturn
@@ -129,8 +138,6 @@ struct SubmittableTextView: UIViewRepresentable {
         view.onEscape = onEscape
         view.handlesEscape = handlesEscape
         view.maxHeight = Self.maxHeight(for: view.font ?? UIFont.preferredFont(forTextStyle: .body))
-        view.layer.borderColor = UIColor.separator.resolvedColor(
-            with: view.traitCollection).cgColor
 
         // Focus is requested programmatically (open draft, begin edit). Hop off
         // the SwiftUI update pass before touching the responder so the
@@ -215,6 +222,14 @@ final class ReturnInterceptingTextView: UITextView {
         insertText("\n")
     }
     @objc private func handleEscapeCommand() { onEscape?() }
+
+    /// Re-resolve the CALayer border against the current trait collection.
+    /// `layer.borderColor` is a raw CGColor that doesn't follow dynamic colors,
+    /// so it must be refreshed explicitly on a light/dark switch (see the
+    /// `registerForTraitChanges` call in `makeUIView`).
+    func refreshBorderColor() {
+        layer.borderColor = UIColor.separator.resolvedColor(with: traitCollection).cgColor
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()

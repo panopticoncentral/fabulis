@@ -5,6 +5,7 @@ struct ServerUnreachableView: View {
     let serverURL: String
     let message: String
     @State private var isRetrying = false
+    @State private var showingResetConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -20,7 +21,6 @@ struct ServerUnreachableView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal)
                 Button { Task { await retry() } } label: {
                     Group { if isRetrying { ProgressView() } else { Text("Try again") } }
                         .frame(maxWidth: .infinity)
@@ -28,15 +28,26 @@ struct ServerUnreachableView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(isRetrying)
-                .padding(.horizontal)
                 Button("Use a different server") {
-                    Task { await appState.resetServer() }
+                    showingResetConfirm = true
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(isRetrying)
             }
-            .padding(.top, 80)
+            .frame(maxWidth: 420)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+            .confirmationDialog("Disconnect from this server?",
+                                isPresented: $showingResetConfirm,
+                                titleVisibility: .visible) {
+                Button("Disconnect", role: .destructive) {
+                    Task { await appState.resetServer() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You'll need to re-enter the server URL and password to reconnect.")
+            }
         }
     }
 

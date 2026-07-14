@@ -16,6 +16,7 @@ struct OneLinerEditSheet: View {
     @State private var isLoading = true
     @State private var saving = false
     @State private var errorMessage: String?
+    @State private var showingDeleteConfirm = false
 
     init(oneLiner: OneLinerSummary, categoryId: Int, onChanged: (() -> Void)? = nil) {
         self.oneLinerId = oneLiner.id
@@ -40,7 +41,7 @@ struct OneLinerEditSheet: View {
                 }
                 Section {
                     Button(role: .destructive) {
-                        Task { await delete() }
+                        showingDeleteConfirm = true
                     } label: {
                         Label("Delete One-liner", systemImage: "trash")
                     }
@@ -49,10 +50,10 @@ struct OneLinerEditSheet: View {
             }
             .navigationTitle("Edit One-liner")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.fixedSize()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task { await save() }
                     } label: {
@@ -60,9 +61,16 @@ struct OneLinerEditSheet: View {
                     }
                     .disabled(saving || isLoading
                         || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fixedSize()
                 }
             }
             .overlay { if isLoading { ProgressView() } }
+            .alert("Delete one-liner?", isPresented: $showingDeleteConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) { Task { await delete() } }
+            } message: {
+                Text("This deletes the one-liner. This cannot be undone.")
+            }
             .alert("Couldn't save", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } })) {

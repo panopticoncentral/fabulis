@@ -15,8 +15,8 @@ struct LibraryKindTests {
         #expect(LibraryKind.stories.hasCategories == true)
     }
 
-    @Test func allCasesOrderedPromptsDraftsStories() {
-        #expect(LibraryKind.allCases == [.prompts, .drafts, .stories])
+    @Test func allCasesInSwitcherOrder() {
+        #expect(LibraryKind.allCases == [.prompts, .oneLiners, .tropes, .drafts, .stories])
     }
 
     @Test func promptsHaveCategories() {

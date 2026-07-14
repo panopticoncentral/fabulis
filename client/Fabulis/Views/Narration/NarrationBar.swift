@@ -25,28 +25,36 @@ struct NarrationBar: View {
             HStack(spacing: 16) {
                 Button { player.seek(by: -10) } label: {
                     Image(systemName: "gobackward.10")
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .disabled(isPreparingOrIdle)
+                .accessibilityLabel("Skip back 10 seconds")
 
                 Button { player.togglePlayPause() } label: {
-                    if case .preparing = player.state {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    Group {
+                        if case .preparing = player.state {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        }
                     }
+                    .frame(minWidth: 44, minHeight: 44)
                 }
                 .disabled(isPreparingOrIdle && !isPlayable)
+                .accessibilityLabel(isPlaying ? "Pause" : "Play")
 
                 Button { player.seek(by: 10) } label: {
                     Image(systemName: "goforward.10")
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .disabled(isPreparingOrIdle)
+                .accessibilityLabel("Skip forward 10 seconds")
 
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
                     if let idx = player.currentBubbleIndex {
-                        Text("Bubble \(idx) / \(player.totalBubbles)")
+                        Text("Part \(idx) of \(player.totalBubbles)")
                             .font(.caption.weight(.medium))
                     }
                     Text(timeLabel)

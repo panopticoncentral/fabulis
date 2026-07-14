@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct ModelPickerView: View {
+    var title: String = "Model"
     let currentModel: String?
     let onPick: (String) -> Void
 
+    @Environment(\.dismiss) private var dismiss
     @State private var models: [ModelInfo] = []
     @State private var search: String = ""
     @State private var isLoading = true
@@ -20,15 +22,16 @@ struct ModelPickerView: View {
             if isLoading {
                 ProgressView()
             } else if let errorMessage {
-                VStack(spacing: 12) {
-                    Text("Couldn't load models").font(.headline)
-                    Text(errorMessage).font(.caption).foregroundStyle(.secondary)
-                    Button("Retry") { Task { await load() } }
-                }
-                .padding()
+                LoadFailedView(title: "Couldn't load models",
+                               message: errorMessage) { Task { await load() } }
+            } else if filtered.isEmpty {
+                ContentUnavailableView.search(text: search)
             } else {
                 List(filtered) { model in
-                    Button { onPick(model.id) } label: {
+                    Button {
+                        onPick(model.id)
+                        dismiss()
+                    } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(model.id).font(.body.monospaced())
@@ -36,16 +39,20 @@ struct ModelPickerView: View {
                             }
                             Spacer()
                             if model.id == currentModel {
-                                Image(systemName: "checkmark").foregroundStyle(.tint)
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.tint)
+                                    .accessibilityHidden(true)
                             }
                         }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.id == currentModel ? [.isSelected] : [])
                 }
             }
         }
         .searchable(text: $search, prompt: "Filter models")
-        .navigationTitle("Assistant Model")
+        .navigationTitle(title)
         .task { await load() }
     }
 

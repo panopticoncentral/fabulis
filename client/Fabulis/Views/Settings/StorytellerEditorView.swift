@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StorytellerEditorView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var existing: StorytellerDto?
     @State private var name: String = ""
     @State private var prompt: String = ""
@@ -13,8 +14,21 @@ struct StorytellerEditorView: View {
     @State private var topK: String = ""
     @State private var topA: String = ""
     @State private var isSaving = false
+    @State private var isLoading = true
     @State private var savedAt: Date?
     @State private var errorMessage: String?
+    @State private var showingDiscardConfirm = false
+
+    // Snapshot of the loaded values (joined into one string over all fields),
+    // to detect unsaved edits before the pushed editor is popped by Back.
+    @State private var originalSignature = ""
+
+    private var currentSignature: String {
+        [name, prompt, titlingPrompt, modelName, String(temperature),
+         topP, maxTokens, minP, topK, topA].joined(separator: "\u{1}")
+    }
+
+    private var hasChanges: Bool { !isLoading && currentSignature != originalSignature }
 
     var body: some View {
         Form {
@@ -29,7 +43,7 @@ struct StorytellerEditorView: View {
             }
             Section("Model") {
                 NavigationLink {
-                    ModelPickerView(currentModel: modelName) { picked in
+                    ModelPickerView(title: "Storyteller Model", currentModel: modelName) { picked in
                         modelName = picked
                     }
                 } label: {
@@ -38,8 +52,11 @@ struct StorytellerEditorView: View {
             }
             Section("Sampling") {
                 HStack {
-                    Text("Temperature").frame(width: 110, alignment: .leading)
-                    Slider(value: $temperature, in: 0...2, step: 0.05)
+                    Text("Temperature")
+                    Slider(value: $temperature, in: 0...2, step: 0.05) {
+                        Text("Temperature")
+                    }
+                    .accessibilityValue(String(format: "%.2f", temperature))
                     Text(String(format: "%.2f", temperature)).font(.caption.monospacedDigit())
                 }
                 LabeledNumberField(label: "top_p (0-1)", value: $topP)
@@ -55,12 +72,26 @@ struct StorytellerEditorView: View {
                 Section { Text(errorMessage).foregroundStyle(.red) }
             }
         }
+        .disabled(isLoading)
+        .overlay { if isLoading { ProgressView().controlSize(.large) } }
         .navigationTitle("Storyteller")
+        .navigationBarBackButtonHidden(hasChanges)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            if hasChanges {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showingDiscardConfirm = true }.fixedSize()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
                 Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
                     .disabled(!canSave || isSaving)
+                    .fixedSize()
             }
+        }
+        .confirmationDialog("Discard changes?", isPresented: $showingDiscardConfirm,
+                            titleVisibility: .visible) {
+            Button("Discard Changes", role: .destructive) { dismiss() }
+            Button("Keep Editing", role: .cancel) {}
         }
         .task { await load() }
     }
@@ -85,9 +116,11 @@ struct StorytellerEditorView: View {
             minP = s.minP.map { String($0) } ?? ""
             topK = s.topK.map { String($0) } ?? ""
             topA = s.topA.map { String($0) } ?? ""
+            originalSignature = currentSignature
         } catch {
             errorMessage = error.localizedDescription
         }
+        isLoading = false
     }
 
     private func save() async {
@@ -105,6 +138,7 @@ struct StorytellerEditorView: View {
                 topK: Int(topK),
                 topA: Double(topA)))
             savedAt = Date()
+            originalSignature = currentSignature
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -116,8 +150,7 @@ private struct LabeledNumberField: View {
     @Binding var value: String
 
     var body: some View {
-        HStack {
-            Text(label).frame(width: 110, alignment: .leading)
+        LabeledContent(label) {
             TextField("blank = unset", text: $value)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)

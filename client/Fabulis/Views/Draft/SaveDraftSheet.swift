@@ -71,10 +71,12 @@ struct SaveDraftSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .fixedSize()
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
                         .disabled(!canSave || isSaving)
+                        .fixedSize()
                 }
             }
             .task {
@@ -102,6 +104,10 @@ struct SaveDraftSheet: View {
     }
 
     private func loadStories(in categoryId: Int) async {
+        // Reset the selection first: a story id from the previously selected
+        // category is not a valid tag in the new category's picker, and would
+        // otherwise let the user save into this category with another's story id.
+        selectedStoryId = nil
         do {
             let detail = try await FabulisAPIClient.shared.category(id: categoryId)
             storiesInCategory = detail.stories

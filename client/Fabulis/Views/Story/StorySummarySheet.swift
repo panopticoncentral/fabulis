@@ -17,6 +17,8 @@ struct StorySummarySheet: View {
     // a moment, so we can't rely on the server status alone to show progress.
     @State private var awaitingRebuild = false
     @State private var pollTask: Task<Void, Never>?
+    @State private var actionError: String?
+    @State private var showingRegenerateConfirm = false
 
     private var isBusy: Bool { awaitingRebuild || summary?.status == "generating" }
 
@@ -36,26 +38,42 @@ struct StorySummarySheet: View {
             .navigationTitle("Summary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    if isEditing {
+                        Button("Cancel") { isEditing = false }.fixedSize()
+                    } else {
+                        Button("Done") { dismiss() }.fixedSize()
+                    }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     if isEditing {
                         Button("Save") { Task { await saveEdit() } }
                             .disabled(isSaving || editDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .fixedSize()
                     } else {
                         Menu {
                             Button("Edit", systemImage: "pencil") { beginEdit() }
                                 .disabled(isBusy)
                             Button("Regenerate", systemImage: "arrow.clockwise") {
-                                Task { await regenerate() }
+                                showingRegenerateConfirm = true
                             }
                             .disabled(isBusy)
                         } label: {
                             Image(systemName: "ellipsis.circle")
                         }
+                        .accessibilityLabel("Summary options")
                     }
                 }
+            }
+            // Editing holds unsaved text; block accidental swipe/Esc dismissal
+            // while it differs from the saved summary.
+            .interactiveDismissDisabled(isEditing && editDraft != (summary?.text ?? ""))
+            .actionErrorAlert($actionError)
+            .alert("Regenerate summary?", isPresented: $showingRegenerateConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Regenerate", role: .destructive) { Task { await regenerate() } }
+            } message: {
+                Text("This replaces the current summary, including any edits you've made. This cannot be undone.")
             }
         }
         .task { await load(); startPollingIfNeeded() }
@@ -98,11 +116,8 @@ struct StorySummarySheet: View {
                 }
             }
         } else if let errorMessage {
-            VStack(spacing: 12) {
-                Text("Couldn't load summary").font(.headline)
-                Text(errorMessage).font(.caption).foregroundStyle(.secondary)
-                Button("Retry") { Task { await load() } }
-            }
+            LoadFailedView(title: "Couldn't load summary",
+                           message: errorMessage) { Task { await load() } }
         }
     }
 
@@ -162,7 +177,10 @@ struct StorySummarySheet: View {
             awaitingRebuild = true
             startPolling(awaitingChangeFrom: baseline)
         } catch {
-            errorMessage = error.localizedDescription
+            // Surface via the always-present action alert: `content` only shows
+            // `errorMessage` when there is no summary, so a regenerate failure
+            // over an existing summary would otherwise be invisible.
+            actionError = error.localizedDescription
         }
     }
 

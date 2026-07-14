@@ -15,6 +15,7 @@ struct TropeEditSheet: View {
     @State private var isLoading = true
     @State private var saving = false
     @State private var errorMessage: String?
+    @State private var showingDeleteConfirm = false
 
     init(trope: TropeSummary, categoryId: Int, onChanged: (() -> Void)? = nil) {
         self.tropeId = trope.id
@@ -39,7 +40,7 @@ struct TropeEditSheet: View {
                 }
                 Section {
                     Button(role: .destructive) {
-                        Task { await delete() }
+                        showingDeleteConfirm = true
                     } label: {
                         Label("Delete Trope", systemImage: "trash")
                     }
@@ -48,10 +49,10 @@ struct TropeEditSheet: View {
             }
             .navigationTitle("Edit Trope")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.fixedSize()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task { await save() }
                     } label: {
@@ -59,9 +60,16 @@ struct TropeEditSheet: View {
                     }
                     .disabled(saving || isLoading
                         || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fixedSize()
                 }
             }
             .overlay { if isLoading { ProgressView() } }
+            .alert("Delete trope?", isPresented: $showingDeleteConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) { Task { await delete() } }
+            } message: {
+                Text("This deletes the trope. This cannot be undone.")
+            }
             .alert("Couldn't save", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } })) {

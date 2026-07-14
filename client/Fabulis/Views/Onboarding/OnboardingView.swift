@@ -36,13 +36,17 @@ struct OnboardingView: View {
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
                                 .focused($focused, equals: .url)
+                                .submitLabel(.next)
+                                .onSubmit { focused = .password }
                         }
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Vault password").font(.headline)
                             SecureField("Vault password", text: $password)
                                 .textFieldStyle(.roundedBorder)
-                                .textContentType(.oneTimeCode)
+                                .textContentType(.password)
                                 .focused($focused, equals: .password)
+                                .submitLabel(.go)
+                                .onSubmit { if canSubmit { Task { await submit() } } }
                         }
                         if let errorMessage {
                             Text(errorMessage).font(.caption).foregroundStyle(.red)
@@ -64,6 +68,8 @@ struct OnboardingView: View {
                     .disabled(!canSubmit)
                     .padding(.horizontal)
                 }
+                .frame(maxWidth: 460)
+                .frame(maxWidth: .infinity)
             }
         }
         .onAppear { focused = .url }

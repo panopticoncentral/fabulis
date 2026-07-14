@@ -11,21 +11,32 @@ struct PromptCategoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var detail: PromptCategoryDetail?
     @State private var errorMessage: String?
+    @State private var actionError: String?
     @State private var isLoading = true
     @State private var creating = false
     @State private var editingPromptId: Int?
     @State private var showingRenameSheet = false
     @State private var showingDeleteConfirm = false
     @State private var promptPendingDeletion: PromptSummary?
+    @State private var search = ""
+
+    private var filteredPrompts: [PromptSummary] {
+        guard let prompts = detail?.prompts else { return [] }
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return prompts }
+        return prompts.filter { $0.title.lowercased().contains(q) }
+    }
 
     var body: some View {
         Group {
             if let detail {
                 if detail.prompts.isEmpty {
                     ContentUnavailableView("No prompts", systemImage: "text.bubble",
-                        description: Text("Tap \u{201C}New Prompt\u{201D} to add one."))
+                        description: Text("Choose \u{201C}New Prompt\u{201D} to add one."))
+                } else if filteredPrompts.isEmpty {
+                    ContentUnavailableView.search(text: search)
                 } else {
-                    List(detail.prompts) { prompt in
+                    List(filteredPrompts) { prompt in
                         Button {
                             editingPromptId = prompt.id
                         } label: {
@@ -42,6 +53,7 @@ struct PromptCategoryView: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
                                 promptPendingDeletion = prompt
@@ -61,15 +73,12 @@ struct PromptCategoryView: View {
             } else if isLoading {
                 ProgressView()
             } else if let errorMessage {
-                VStack(spacing: 12) {
-                    Text("Couldn't load prompts").font(.headline)
-                    Text(errorMessage).font(.caption).foregroundStyle(.secondary)
-                    Button("Retry") { Task { await load() } }
-                }
-                .padding()
+                LoadFailedView(title: "Couldn't load prompts",
+                               message: errorMessage) { Task { await load() } }
             }
         }
         .navigationTitle(detail?.name ?? categoryName)
+        .searchable(text: $search, prompt: "Filter prompts")
         .navigationDestination(item: $editingPromptId) { id in
             PromptEditorView(promptId: id, onSaved: {
                 editingPromptId = nil
@@ -88,13 +97,20 @@ struct PromptCategoryView: View {
                     }
                 }
                 .disabled(creating)
+                .fixedSize()
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { Task { await load() } } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: .command)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { showingRenameSheet = true } label: { Label("Rename", systemImage: "pencil") }
                     Button(role: .destructive) { showingDeleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Label("Category Options", systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -111,7 +127,7 @@ struct PromptCategoryView: View {
                     Button("Delete", role: .destructive) { Task { await deleteCategory() } }
                },
                message: {
-                    Text("This deletes the category and all its stories, prompts, and one-liners. This cannot be undone.")
+                    Text(LibraryCopy.deleteCategoryWarning)
                })
         .alert("Delete prompt?",
                isPresented: Binding(
@@ -127,6 +143,7 @@ struct PromptCategoryView: View {
                message: { _ in
                     Text("This deletes the prompt and its messages. This cannot be undone.")
                })
+        .actionErrorAlert($actionError)
         .task { await load() }
         .refreshable { await load() }
     }
@@ -149,7 +166,7 @@ struct PromptCategoryView: View {
             onChanged?()
             editingPromptId = created.id
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
         }
     }
 
@@ -159,7 +176,7 @@ struct PromptCategoryView: View {
             await load()
             onChanged?()
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
         }
     }
 
@@ -168,7 +185,7 @@ struct PromptCategoryView: View {
             try await FabulisAPIClient.shared.deleteCategory(id: categoryId)
             if let onDeleted { onDeleted() } else { dismiss() }
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
         }
     }
 }

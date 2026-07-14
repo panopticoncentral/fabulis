@@ -25,10 +25,13 @@ struct EditCategorySheet: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.fixedSize()
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+                        .fixedSize()
                 }
             }
             .onAppear { name = initialName }

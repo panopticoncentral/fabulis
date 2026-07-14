@@ -6,22 +6,41 @@ enum LibrarySelection: Hashable {
 }
 
 struct LibraryView: View {
+    @Environment(AppState.self) private var appState
     @State private var selectedKind: LibraryKind = .prompts
     @State private var categories: [CategorySummary] = []
     @State private var drafts: [DraftSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var actionError: String?
     @State private var creatingDraft = false
     @State private var selection: LibrarySelection?
     @State private var showingNewCategorySheet = false
-    @State private var showingSettingsSheet = false
     @State private var categoryPendingDeletion: CategorySummary?
     @State private var draftPendingDeletion: DraftSummary?
+    @State private var search = ""
+
+    private var searchPrompt: String {
+        selectedKind == .drafts ? "Filter drafts" : "Filter categories"
+    }
+
+    private var filteredDrafts: [DraftSummary] {
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return drafts }
+        return drafts.filter { ($0.title ?? "").lowercased().contains(q) }
+    }
+
+    private var filteredCategories: [CategorySummary] {
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return categories }
+        return categories.filter { $0.name.lowercased().contains(q) }
+    }
 
     var body: some View {
         NavigationSplitView {
             sidebar
                 .navigationTitle("Library")
+                .searchable(text: $search, prompt: searchPrompt)
                 .toolbar { toolbarContent }
                 .onChange(of: selectedKind) { _, _ in selection = nil }
                 .sheet(isPresented: $showingNewCategorySheet) {
@@ -29,8 +48,15 @@ struct LibraryView: View {
                         Task { await load() }
                     })
                 }
-                .sheet(isPresented: $showingSettingsSheet) {
+                .sheet(isPresented: Binding(
+                    get: { appState.showSettings },
+                    set: { appState.showSettings = $0 })) {
                     NavigationStack { SettingsView() }
+                }
+                .onChange(of: appState.newDraftRequested) { _, requested in
+                    guard requested else { return }
+                    appState.newDraftRequested = false
+                    Task { await createDraft() }
                 }
                 .alert("Delete category?",
                        isPresented: Binding(
@@ -44,7 +70,7 @@ struct LibraryView: View {
                             }
                        },
                        message: { _ in
-                            Text("This deletes the category and all its stories, prompts, one-liners, and tropes. This cannot be undone.")
+                            Text(LibraryCopy.deleteCategoryWarning)
                        })
                 .alert("Delete draft?",
                        isPresented: Binding(
@@ -60,6 +86,7 @@ struct LibraryView: View {
                        message: { _ in
                             Text("This deletes the draft and its messages. This cannot be undone.")
                        })
+                .actionErrorAlert($actionError)
                 .task { await load() }
                 .refreshable { await load() }
         } detail: {
@@ -82,15 +109,23 @@ struct LibraryView: View {
                     }
                 }
                 .disabled(creatingDraft)
+                .fixedSize()
             case .stories, .prompts, .oneLiners, .tropes:
                 Button { showingNewCategorySheet = true } label: {
                     Label("New Category", systemImage: "folder.badge.plus")
                 }
+                .fixedSize()
             }
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Button { showingSettingsSheet = true } label: {
-                Image(systemName: "gear")
+            Button { Task { await load() } } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .keyboardShortcut("r", modifiers: .command)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { appState.showSettings = true } label: {
+                Label("Settings", systemImage: "gear")
             }
         }
     }
@@ -116,13 +151,8 @@ struct LibraryView: View {
         if isLoading && categories.isEmpty && drafts.isEmpty {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let errorMessage {
-            VStack(spacing: 12) {
-                Text("Couldn't load library").font(.headline)
-                Text(errorMessage).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                Button("Retry") { Task { await load() } }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding()
+            LoadFailedView(title: "Couldn't load library",
+                           message: errorMessage) { Task { await load() } }
         } else {
             switch selectedKind {
             case .drafts: draftsList
@@ -135,11 +165,13 @@ struct LibraryView: View {
     private var draftsList: some View {
         if drafts.isEmpty {
             ContentUnavailableView("No drafts", systemImage: "doc.text",
-                description: Text("Tap \u{201C}New Draft\u{201D} to start a story."))
+                description: Text("Choose \u{201C}New Draft\u{201D} to start a story."))
+        } else if filteredDrafts.isEmpty {
+            ContentUnavailableView.search(text: search)
         } else {
             List(selection: $selection) {
-                Section("\(drafts.count) Draft\(drafts.count == 1 ? "" : "s")") {
-                    ForEach(drafts) { draft in
+                Section("\(filteredDrafts.count) Draft\(filteredDrafts.count == 1 ? "" : "s")") {
+                    ForEach(filteredDrafts) { draft in
                         DraftRow(draft: draft)
                             .tag(LibrarySelection.draft(id: draft.id))
                             .swipeActions(edge: .trailing) {
@@ -167,10 +199,12 @@ struct LibraryView: View {
         if categories.isEmpty {
             ContentUnavailableView("No categories",
                 systemImage: "books.vertical",
-                description: Text("Save a draft to a category to see it here."))
+                description: Text(emptyCategoriesHint))
+        } else if filteredCategories.isEmpty {
+            ContentUnavailableView.search(text: search)
         } else {
             List(selection: $selection) {
-                ForEach(categories) { category in
+                ForEach(filteredCategories) { category in
                     CategoryRow(category: category, kind: selectedKind)
                         .tag(LibrarySelection.category(id: category.id, name: category.name))
                         .swipeActions(edge: .trailing) {
@@ -189,6 +223,17 @@ struct LibraryView: View {
                         }
                 }
             }
+        }
+    }
+
+    private var emptyCategoriesHint: String {
+        switch selectedKind {
+        case .stories:
+            return "Save a draft to a category to see it here."
+        case .prompts, .oneLiners, .tropes:
+            return "Choose \u{201C}New Category\u{201D} to add one."
+        case .drafts:
+            return ""
         }
     }
 
@@ -255,10 +300,18 @@ struct LibraryView: View {
             async let draftList = FabulisAPIClient.shared.listDrafts()
             categories = try await lib.categories
             drafts = try await draftList
-        } catch APIError.unauthorized {
-            errorMessage = "Session expired."
         } catch {
-            errorMessage = error.localizedDescription
+            let message: String
+            if case APIError.unauthorized = error { message = "Session expired." }
+            else { message = error.localizedDescription }
+            // Only take over the sidebar with a full-screen error when there is
+            // nothing to show. A failed refresh with data present surfaces as a
+            // transient alert so the user keeps their list and selection.
+            if categories.isEmpty && drafts.isEmpty {
+                errorMessage = message
+            } else {
+                actionError = message
+            }
         }
         isLoading = false
     }
@@ -271,7 +324,7 @@ struct LibraryView: View {
         do {
             try await FabulisAPIClient.shared.deleteCategory(id: category.id)
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
             await load()
         }
     }
@@ -284,7 +337,7 @@ struct LibraryView: View {
         do {
             try await FabulisAPIClient.shared.deleteDraft(id: draft.id)
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
             await load()
         }
     }
@@ -298,7 +351,7 @@ struct LibraryView: View {
             selectedKind = .drafts
             selection = .draft(id: draft.id)
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
         }
     }
 }

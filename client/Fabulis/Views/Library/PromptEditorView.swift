@@ -12,6 +12,7 @@ struct PromptEditorView: View {
         var text: String
     }
 
+    @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var categoryId: Int?
     @State private var categories: [CategorySummary] = []
@@ -19,6 +20,19 @@ struct PromptEditorView: View {
     @State private var isLoading = true
     @State private var saving = false
     @State private var errorMessage: String?
+    @State private var showingDiscardConfirm = false
+
+    // Snapshot of the loaded values, to detect unsaved edits before the
+    // (pushed) editor is popped by the system Back button.
+    @State private var originalTitle = ""
+    @State private var originalCategoryId: Int?
+    @State private var originalMessageTexts: [String] = []
+
+    private var hasChanges: Bool {
+        title != originalTitle
+            || categoryId != originalCategoryId
+            || messages.map(\.text) != originalMessageTexts
+    }
 
     var body: some View {
         Form {
@@ -48,19 +62,31 @@ struct PromptEditorView: View {
             }
         }
         .navigationTitle("Edit Prompt")
+        .navigationBarBackButtonHidden(hasChanges)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) { EditButton() }
-            ToolbarItem(placement: .topBarLeading) {
+            if hasChanges {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showingDiscardConfirm = true }.fixedSize()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
                 Button {
                     Task { await save() }
                 } label: {
                     if saving { ProgressView().controlSize(.mini) } else { Text("Save") }
                 }
                 .disabled(saving || isLoading || categoryId == nil)
+                .fixedSize()
             }
+            ToolbarItem(placement: .topBarTrailing) { EditButton().fixedSize() }
         }
         .overlay {
             if isLoading { ProgressView() }
+        }
+        .confirmationDialog("Discard changes?", isPresented: $showingDiscardConfirm,
+                            titleVisibility: .visible) {
+            Button("Discard Changes", role: .destructive) { dismiss() }
+            Button("Keep Editing", role: .cancel) {}
         }
         .alert("Couldn't save", isPresented: Binding(
             get: { errorMessage != nil },
@@ -83,6 +109,9 @@ struct PromptEditorView: View {
             messages = prompt.messages
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map { EditableMessage(text: $0.content) }
+            originalTitle = title
+            originalCategoryId = categoryId
+            originalMessageTexts = messages.map(\.text)
         } catch {
             errorMessage = error.localizedDescription
         }

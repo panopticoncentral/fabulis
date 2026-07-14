@@ -8,10 +8,19 @@ struct CategoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var detail: CategoryDetail?
     @State private var errorMessage: String?
+    @State private var actionError: String?
     @State private var isLoading = true
     @State private var showingRenameSheet = false
     @State private var showingDeleteConfirm = false
     @State private var deleting = false
+    @State private var search = ""
+
+    private var filteredStories: [StorySummary] {
+        guard let stories = detail?.stories else { return [] }
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return stories }
+        return stories.filter { $0.title.lowercased().contains(q) }
+    }
 
     var body: some View {
         Group {
@@ -19,8 +28,10 @@ struct CategoryView: View {
                 if detail.stories.isEmpty {
                     ContentUnavailableView("No stories", systemImage: "doc.text",
                         description: Text("Stories saved into this category will appear here."))
+                } else if filteredStories.isEmpty {
+                    ContentUnavailableView.search(text: search)
                 } else {
-                    List(detail.stories) { story in
+                    List(filteredStories) { story in
                         NavigationLink(value: story) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(story.title).font(.body)
@@ -33,25 +44,28 @@ struct CategoryView: View {
             } else if isLoading {
                 ProgressView()
             } else if let errorMessage {
-                VStack(spacing: 12) {
-                    Text("Couldn't load category").font(.headline)
-                    Text(errorMessage).font(.caption).foregroundStyle(.secondary)
-                    Button("Retry") { Task { await load() } }
-                }
-                .padding()
+                LoadFailedView(title: "Couldn't load category",
+                               message: errorMessage) { Task { await load() } }
             }
         }
         .navigationTitle(detail?.name ?? categoryName)
+        .searchable(text: $search, prompt: "Filter stories")
         .navigationDestination(for: StorySummary.self) { story in
             StoryView(storyId: story.id, fallbackTitle: story.title)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button { Task { await load() } } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: .command)
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { showingRenameSheet = true } label: { Label("Rename", systemImage: "pencil") }
                     Button(role: .destructive) { showingDeleteConfirm = true } label: { Label("Delete", systemImage: "trash") }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Label("Category Options", systemImage: "ellipsis.circle")
                 }
             }
         }
@@ -68,8 +82,9 @@ struct CategoryView: View {
                     Button("Delete", role: .destructive) { Task { await deleteCategory() } }
                },
                message: {
-                    Text("This deletes the category and all its stories, prompts, one-liners, and tropes. This cannot be undone.")
+                    Text(LibraryCopy.deleteCategoryWarning)
                })
+        .actionErrorAlert($actionError)
         .task { await load() }
         .refreshable { await load() }
     }
@@ -94,7 +109,7 @@ struct CategoryView: View {
                 dismiss()
             }
         } catch {
-            errorMessage = error.localizedDescription
+            actionError = error.localizedDescription
         }
     }
 }
