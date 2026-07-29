@@ -132,7 +132,18 @@ struct SubmittableTextView: UIViewRepresentable {
         context.coordinator.parent = self
 
         if view.text != text { view.text = text }
-        view.isEditable = isEditable
+        // Setting isEditable = false on a first-responder UITextView makes it
+        // resign first responder *synchronously*. Doing that here — inside the
+        // SwiftUI update pass — re-enters the view graph via the hosting view's
+        // canBecomeFirstResponder getter and trips an AttributeGraph cycle that
+        // hangs the app (catastrophically so under the debugger, whose log
+        // redirection makes the cycle print crawl). It's the same mid-update
+        // responder mutation the focus code below defers. So only write on a
+        // real change, and defer it so any implicit resign lands outside the
+        // update pass.
+        if view.isEditable != isEditable {
+            DispatchQueue.main.async { view.isEditable = isEditable }
+        }
         view.placeholderLabel?.isHidden = !text.isEmpty
         view.onReturn = onReturn
         view.onEscape = onEscape
@@ -141,8 +152,10 @@ struct SubmittableTextView: UIViewRepresentable {
 
         // Focus is requested programmatically (open draft, begin edit). Hop off
         // the SwiftUI update pass before touching the responder so the
-        // delegate's focus write-back doesn't mutate state mid-update.
-        if isFocused, !view.isFirstResponder, view.isEditable {
+        // delegate's focus write-back doesn't mutate state mid-update. Gate on
+        // the incoming isEditable, not view.isEditable, since the write above is
+        // deferred and hasn't landed yet.
+        if isFocused, !view.isFirstResponder, isEditable {
             DispatchQueue.main.async { view.becomeFirstResponder() }
         } else if !isFocused, view.isFirstResponder {
             DispatchQueue.main.async { view.resignFirstResponder() }
