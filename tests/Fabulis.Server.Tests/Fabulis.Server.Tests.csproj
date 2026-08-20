@@ -12,8 +12,9 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
+    <!-- EF Core SQLite and the SQLCipher provider come from the Fabulis.Server
+         reference below; referencing the non-.Core packages here would drag the
+         bundled e_sqlite3 native library back in. -->
   </ItemGroup>
 
   <ItemGroup>

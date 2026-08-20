@@ -59,7 +59,9 @@ static async Task<int> RunVaultCommandAsync(string command, string path)
     }
 
     var optionsBuilder = new DbContextOptionsBuilder<FabulisDbContext>();
-    optionsBuilder.UseSqlite($"Data Source={dbPath};Password={password}");
+    optionsBuilder.UseSqlite(
+        $"Data Source={dbPath};Password={password}",
+        sqlite => sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
 
     await using var db = new FabulisDbContext(optionsBuilder.Options);
 

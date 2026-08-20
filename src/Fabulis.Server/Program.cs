@@ -15,7 +15,9 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
         var dataDir = Path.Combine(AppContext.BaseDirectory, "data");
         Directory.CreateDirectory(dataDir);
         var dbPath = Path.Combine(dataDir, "fabulis.db");
-        options.UseSqlite($"Data Source={dbPath};Password={vault.Password}");
+        options.UseSqlite(
+            $"Data Source={dbPath};Password={vault.Password}",
+            sqlite => sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
     }
 });
 
