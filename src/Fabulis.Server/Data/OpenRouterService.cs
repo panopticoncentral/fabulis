@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Data;
 
-public class OpenRouterService(IHttpClientFactory httpClientFactory, IServiceProvider services, VaultService vault)
+public class OpenRouterService(IHttpClientFactory httpClientFactory, IServiceProvider services, VaultService vault, ILogger<OpenRouterService> log)
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -24,11 +24,55 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
         { } effort => new { effort = effort.ToString().ToLowerInvariant() }
     };
 
+    /// <summary>
+    /// Renders the sampling knobs actually being sent, skipping the ones left
+    /// unset, so the log line shows the request as OpenRouter will see it.
+    /// </summary>
+    private static string DescribeSettings(double temperature, double? topP, int? maxTokens,
+        double? minP, int? topK, double? topA, ReasoningEffort? reasoning)
+    {
+        // Invariant throughout: a comma-decimal locale must not make the log
+        // disagree with the JSON actually on the wire.
+        var parts = new List<string> { FormattableString.Invariant($"temperature={temperature}") };
+        if (topP.HasValue) parts.Add(FormattableString.Invariant($"top_p={topP.Value}"));
+        if (maxTokens.HasValue) parts.Add(FormattableString.Invariant($"max_tokens={maxTokens.Value}"));
+        if (minP.HasValue) parts.Add(FormattableString.Invariant($"min_p={minP.Value}"));
+        if (topK.HasValue) parts.Add(FormattableString.Invariant($"top_k={topK.Value}"));
+        if (topA.HasValue) parts.Add(FormattableString.Invariant($"top_a={topA.Value}"));
+        parts.Add($"reasoning={(reasoning.HasValue ? reasoning.Value.ToString().ToLowerInvariant() : "default")}");
+        return string.Join(", ", parts);
+    }
+
+    /// <summary>
+    /// Reports the model OpenRouter actually served, which can differ from the
+    /// one asked for when the request used an auto-routed or ":floor" variant.
+    /// A match is only worth a debug line, since the entry log already named it.
+    /// </summary>
+    private bool LogResolvedModel(string requested, JsonElement root)
+    {
+        if (!root.TryGetProperty("model", out var served) || served.ValueKind != JsonValueKind.String)
+            return false;
+
+        var resolved = served.GetString();
+        if (string.IsNullOrEmpty(resolved))
+            return false;
+
+        if (string.Equals(resolved, requested, StringComparison.Ordinal))
+            log.LogDebug("OpenRouter served model={Model}, as requested.", resolved);
+        else
+            log.LogInformation("OpenRouter routed {Requested} to model={Model}.", requested, resolved);
+
+        return true;
+    }
+
     public async Task<string> ChatAsync(string model, string systemPrompt, string userMessage,
         double temperature = 0.7, double? topP = null, int? maxTokens = null,
         double? minP = null, int? topK = null, double? topA = null,
         ReasoningEffort? reasoning = null)
     {
+        log.LogInformation("OpenRouter completion: model={Model} ({Settings})",
+            model, DescribeSettings(temperature, topP, maxTokens, minP, topK, topA, reasoning));
+
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
             ?? throw new InvalidOperationException("OpenRouter API key is not configured. Set it in Settings.");
 
@@ -67,6 +111,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        LogResolvedModel(model, json);
+
         return json.GetProperty("choices")[0]
             .GetProperty("message")
             .GetProperty("content")
@@ -79,6 +125,9 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
         ReasoningEffort? reasoning = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        log.LogInformation("OpenRouter stream: model={Model}, messages={MessageCount} ({Settings})",
+            model, messages.Count, DescribeSettings(temperature, topP, maxTokens, minP, topK, topA, reasoning));
+
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
             ?? throw new InvalidOperationException("OpenRouter API key is not configured. Set it in Settings.");
 
@@ -130,6 +179,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
         using var stream = await response.Content.ReadAsStreamAsync(ct);
         using var reader = new StreamReader(stream);
 
+        var resolvedLogged = false;
+
         while (true)
         {
             var line = await reader.ReadLineAsync(ct);
@@ -144,6 +195,11 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             try
             {
                 var json = JsonDocument.Parse(data);
+
+                // Ahead of the delta, which some chunks lack entirely.
+                if (!resolvedLogged)
+                    resolvedLogged = LogResolvedModel(model, json.RootElement);
+
                 var delta = json.RootElement
                     .GetProperty("choices")[0]
                     .GetProperty("delta");

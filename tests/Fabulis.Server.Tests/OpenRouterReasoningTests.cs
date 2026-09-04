@@ -6,6 +6,7 @@ using Fabulis.Server.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Fabulis.Server.Tests;
@@ -39,7 +40,8 @@ public class OpenRouterReasoningTests : IDisposable
         }
 
         var factory = new FixedHttpClientFactory(new HttpClient(_stub));
-        _openRouter = new OpenRouterService(factory, _services, new VaultService(new SessionTokenStore()));
+        _openRouter = new OpenRouterService(factory, _services, new VaultService(new SessionTokenStore()),
+            NullLogger<OpenRouterService>.Instance);
     }
 
     public void Dispose()
