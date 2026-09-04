@@ -244,11 +244,13 @@ public sealed class SummaryService : BackgroundService
 
     private static async Task<(string? model, string prompt)> ResolveModelAndPromptAsync(FabulisDbContext db)
     {
+        // No explicit summary model falls back to the storyteller's model —
+        // the one the user actually picked for generation.
         var summaryModel = await db.AppSettings.FindAsync("SummaryModel");
-        var assistant = await db.AppSettings.FindAsync("AssistantModel");
         var model = !string.IsNullOrWhiteSpace(summaryModel?.Value)
             ? summaryModel!.Value
-            : assistant?.Value;
+            : await db.Storytellers.OrderBy(s => s.Id)
+                .Select(s => s.ModelName).FirstOrDefaultAsync();
 
         var promptSetting = await db.AppSettings.FindAsync("SummaryPrompt");
         var prompt = string.IsNullOrWhiteSpace(promptSetting?.Value)

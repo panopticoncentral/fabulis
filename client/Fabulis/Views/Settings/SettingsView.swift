@@ -45,20 +45,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Assistant model") {
-                if let settings, let current = settings.assistantModel {
-                    Text(current).font(.callout.monospaced()).foregroundStyle(.secondary)
-                }
-                NavigationLink {
-                    ModelPickerView(title: "Assistant Model",
-                                    currentModel: settings?.assistantModel) { picked in
-                        Task { await saveModel(picked) }
-                    }
-                } label: {
-                    Text(settings?.assistantModel == nil ? "Choose model" : "Change model")
-                }
-            }
-
             Section("Narration") {
                 if let settings, settings.kokoroBaseUrlIsSet {
                     Text("Server URL is set").foregroundStyle(.secondary)
@@ -132,7 +118,7 @@ struct SettingsView: View {
                         Task { await saveSummaryModel(picked) }
                     }
                 } label: {
-                    Text(settings?.summaryModel == nil ? "Choose summary model (defaults to assistant model)" : "Change summary model")
+                    Text(settings?.summaryModel == nil ? "Choose summary model (defaults to the storyteller model)" : "Change summary model")
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -215,15 +201,6 @@ struct SettingsView: View {
             try await FabulisAPIClient.shared.updateSettings(apiKey: key)
             apiKeyDraft = ""
             apiKeyJustSaved = true
-            settings = try await FabulisAPIClient.shared.settings()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    private func saveModel(_ model: String) async {
-        do {
-            try await FabulisAPIClient.shared.updateSettings(assistantModel: model)
             settings = try await FabulisAPIClient.shared.settings()
         } catch {
             errorMessage = error.localizedDescription

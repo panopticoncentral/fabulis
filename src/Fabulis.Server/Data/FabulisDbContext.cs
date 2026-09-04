@@ -217,17 +217,12 @@ public class FabulisDbContext : DbContext
     {
         if (await Storytellers.AnyAsync()) return;
 
-        var assistantModel = await AppSettings
-            .Where(s => s.Key == "AssistantModel")
-            .Select(s => s.Value)
-            .FirstOrDefaultAsync();
-
         Storytellers.Add(new Storyteller
         {
             Name = "Storyteller",
             Prompt = "You are a helpful storyteller.",
             TitlingPrompt = Storyteller.DefaultTitlingPrompt,
-            ModelName = string.IsNullOrWhiteSpace(assistantModel) ? "anthropic/claude-sonnet-4" : assistantModel,
+            ModelName = "anthropic/claude-sonnet-4",
             Temperature = 0.7,
             CreatedAt = DateTime.UtcNow,
         });

@@ -16,7 +16,6 @@ public static class SettingsEndpoints
         group.MapGet("", async (FabulisDbContext db, KokoroService kokoro, CancellationToken ct) =>
         {
             var apiKey = await db.AppSettings.FindAsync(["OpenRouterApiKey"], ct);
-            var assistantModel = await db.AppSettings.FindAsync(["AssistantModel"], ct);
             var autoLock = await db.AppSettings.FindAsync(["AutoLockMinutes"], ct);
             var kokoroUrl = await db.AppSettings.FindAsync(["KokoroBaseUrl"], ct);
             var narrationVoice = await db.AppSettings.FindAsync(["NarrationVoice"], ct);
@@ -26,7 +25,6 @@ public static class SettingsEndpoints
 
             var dto = new SettingsDto(
                 ApiKeyIsSet: apiKey is not null && !string.IsNullOrEmpty(apiKey.Value),
-                AssistantModel: assistantModel?.Value,
                 AutoLockSelection: NormalizeAutoLock(autoLock?.Value),
                 KokoroBaseUrlIsSet: kokoroUrl is not null && !string.IsNullOrWhiteSpace(kokoroUrl.Value),
                 NarrationVoice: narrationVoice?.Value,
@@ -49,9 +47,6 @@ public static class SettingsEndpoints
         {
             if (body.ApiKey is { } apiKey && !string.IsNullOrWhiteSpace(apiKey))
                 await UpsertAsync(db, "OpenRouterApiKey", apiKey.Trim());
-
-            if (body.AssistantModel is { } model && !string.IsNullOrWhiteSpace(model))
-                await UpsertAsync(db, "AssistantModel", model.Trim());
 
             if (body.AutoLockSelection is { } autoLock)
             {

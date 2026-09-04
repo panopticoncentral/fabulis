@@ -202,7 +202,6 @@ struct UpdateTropeRequest: Encodable, Sendable {
 
 struct SettingsDto: Decodable, Sendable {
     let apiKeyIsSet: Bool
-    let assistantModel: String?
     let autoLockSelection: String
     let kokoroBaseUrlIsSet: Bool
     let narrationVoice: String?
@@ -332,9 +331,3 @@ struct GenerateTitleResponse: Decodable, Sendable {
 struct CreateCategoryRequest: Encodable, Sendable { let name: String }
 struct RenameCategoryRequest: Encodable, Sendable { let name: String }
 struct UpdateMessageRequest: Encodable, Sendable { let content: String }
-
-struct SettingsUpdateRequest: Encodable, Sendable {
-    let apiKey: String?
-    let assistantModel: String?
-    let autoLockSelection: String?
-}

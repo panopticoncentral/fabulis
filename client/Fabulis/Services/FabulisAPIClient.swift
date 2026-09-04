@@ -332,7 +332,6 @@ actor FabulisAPIClient {
 
     func updateSettings(
         apiKey: String? = nil,
-        assistantModel: String? = nil,
         autoLockSelection: String? = nil,
         kokoroBaseUrl: String? = nil,
         narrationVoice: String? = nil,
@@ -342,7 +341,6 @@ actor FabulisAPIClient {
     ) async throws {
         struct Body: Encodable {
             let apiKey: String?
-            let assistantModel: String?
             let autoLockSelection: String?
             let kokoroBaseUrl: String?
             let narrationVoice: String?
@@ -355,7 +353,6 @@ actor FabulisAPIClient {
             path: "/settings",
             body: Body(
                 apiKey: apiKey,
-                assistantModel: assistantModel,
                 autoLockSelection: autoLockSelection,
                 kokoroBaseUrl: kokoroBaseUrl,
                 narrationVoice: narrationVoice,
