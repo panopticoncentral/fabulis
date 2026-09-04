@@ -13,6 +13,7 @@ struct StorytellerEditorView: View {
     @State private var minP: String = ""
     @State private var topK: String = ""
     @State private var topA: String = ""
+    @State private var reasoningEffort: ReasoningEffort?
     @State private var isSaving = false
     @State private var isLoading = true
     @State private var savedAt: Date?
@@ -25,7 +26,8 @@ struct StorytellerEditorView: View {
 
     private var currentSignature: String {
         [name, prompt, titlingPrompt, modelName, String(temperature),
-         topP, maxTokens, minP, topK, topA].joined(separator: "\u{1}")
+         topP, maxTokens, minP, topK, topA,
+         reasoningEffort?.rawValue ?? ""].joined(separator: "\u{1}")
     }
 
     private var hasChanges: Bool { !isLoading && currentSignature != originalSignature }
@@ -41,7 +43,7 @@ struct StorytellerEditorView: View {
             Section("Titling prompt") {
                 TextEditor(text: $titlingPrompt).frame(minHeight: 100)
             }
-            Section("Model") {
+            Section {
                 NavigationLink {
                     ModelPickerView(title: "Storyteller Model", currentModel: modelName) { picked in
                         modelName = picked
@@ -49,6 +51,16 @@ struct StorytellerEditorView: View {
                 } label: {
                     LabeledContent("Model", value: modelName.isEmpty ? "—" : modelName)
                 }
+                Picker("Reasoning", selection: $reasoningEffort) {
+                    Text("Model default").tag(ReasoningEffort?.none)
+                    ForEach(ReasoningEffort.allCases, id: \.self) { effort in
+                        Text(effort.label).tag(ReasoningEffort?.some(effort))
+                    }
+                }
+            } header: {
+                Text("Model")
+            } footer: {
+                Text("Reasoning applies to story generation only. Titles and summaries never use it.")
             }
             Section("Sampling") {
                 HStack {
@@ -116,6 +128,7 @@ struct StorytellerEditorView: View {
             minP = s.minP.map { String($0) } ?? ""
             topK = s.topK.map { String($0) } ?? ""
             topA = s.topA.map { String($0) } ?? ""
+            reasoningEffort = s.reasoningEffort
             originalSignature = currentSignature
         } catch {
             errorMessage = error.localizedDescription
@@ -136,7 +149,8 @@ struct StorytellerEditorView: View {
                 maxTokens: Int(maxTokens),
                 minP: Double(minP),
                 topK: Int(topK),
-                topA: Double(topA)))
+                topA: Double(topA),
+                reasoningEffort: reasoningEffort))
             savedAt = Date()
             originalSignature = currentSignature
         } catch {

@@ -196,7 +196,8 @@ public sealed record StorytellerDto(
     int? MaxTokens,
     double? MinP,
     int? TopK,
-    double? TopA);
+    double? TopA,
+    ReasoningEffort? ReasoningEffort);
 
 public sealed record StorytellerUpdateRequest(
     string Name,
@@ -208,7 +209,8 @@ public sealed record StorytellerUpdateRequest(
     int? MaxTokens,
     double? MinP,
     int? TopK,
-    double? TopA);
+    double? TopA,
+    ReasoningEffort? ReasoningEffort);
 
 // ---------- drafts ----------
 public sealed record DraftSummaryDto(

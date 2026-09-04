@@ -276,6 +276,26 @@ struct ModelInfo: Decodable, Identifiable, Sendable {
     let name: String
 }
 
+/// Mirrors the server's ReasoningEffort. A nil value means "unset" — the
+/// server sends no reasoning field and the model uses its own default.
+enum ReasoningEffort: String, Codable, CaseIterable, Sendable {
+    case off = "Off"
+    case minimal = "Minimal"
+    case low = "Low"
+    case medium = "Medium"
+    case high = "High"
+
+    var label: String {
+        switch self {
+        case .off: "Off"
+        case .minimal: "Minimal"
+        case .low: "Low"
+        case .medium: "Medium"
+        case .high: "High"
+        }
+    }
+}
+
 struct StorytellerDto: Decodable, Sendable {
     let id: Int
     let name: String
@@ -288,6 +308,7 @@ struct StorytellerDto: Decodable, Sendable {
     let minP: Double?
     let topK: Int?
     let topA: Double?
+    let reasoningEffort: ReasoningEffort?
 }
 
 struct StorytellerUpdateRequest: Encodable, Sendable {
@@ -301,6 +322,7 @@ struct StorytellerUpdateRequest: Encodable, Sendable {
     let minP: Double?
     let topK: Int?
     let topA: Double?
+    let reasoningEffort: ReasoningEffort?
 }
 
 struct GenerateTitleResponse: Decodable, Sendable {

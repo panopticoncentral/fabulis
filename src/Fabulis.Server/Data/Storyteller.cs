@@ -16,5 +16,13 @@ public class Storyteller
     public double? MinP { get; set; }
     public int? TopK { get; set; }
     public double? TopA { get; set; }
+
+    /// <summary>
+    /// Null means "send no reasoning field and let the model decide"; any
+    /// other value is applied to story generation only, never to titling or
+    /// summarization.
+    /// </summary>
+    public ReasoningEffort? ReasoningEffort { get; set; }
+
     public DateTime CreatedAt { get; set; }
 }

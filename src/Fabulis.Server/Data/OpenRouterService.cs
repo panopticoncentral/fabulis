@@ -12,10 +12,22 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
+    /// <summary>
+    /// Maps a reasoning effort onto OpenRouter's <c>reasoning</c> field, or
+    /// null to leave the field off the request entirely and let the model use
+    /// its own default.
+    /// </summary>
+    private static object? BuildReasoningPayload(ReasoningEffort? reasoning) => reasoning switch
+    {
+        null => null,
+        ReasoningEffort.Off => new { enabled = false },
+        { } effort => new { effort = effort.ToString().ToLowerInvariant() }
+    };
+
     public async Task<string> ChatAsync(string model, string systemPrompt, string userMessage,
         double temperature = 0.7, double? topP = null, int? maxTokens = null,
         double? minP = null, int? topK = null, double? topA = null,
-        bool disableReasoning = false)
+        ReasoningEffort? reasoning = null)
     {
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
             ?? throw new InvalidOperationException("OpenRouter API key is not configured. Set it in Settings.");
@@ -44,12 +56,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             requestBody["top_k"] = topK.Value;
         if (topA.HasValue)
             requestBody["top_a"] = topA.Value;
-        // A title needs no chain-of-thought. Disabling reasoning keeps the call
-        // fast and cheap on hybrid/reasoning models, and — combined with no
-        // max_tokens cap — prevents reasoning tokens from consuming the whole
-        // budget and leaving an empty completion.
-        if (disableReasoning)
-            requestBody["reasoning"] = new { enabled = false };
+        if (BuildReasoningPayload(reasoning) is { } reasoningPayload)
+            requestBody["reasoning"] = reasoningPayload;
 
         var response = await client.PostAsJsonAsync(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -68,6 +76,7 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
     public async IAsyncEnumerable<StreamChunk> ChatStreamAsync(string model, string systemPrompt,
         List<DraftMessage> messages, double temperature = 0.7, double? topP = null, int? maxTokens = null,
         double? minP = null, int? topK = null, double? topA = null,
+        ReasoningEffort? reasoning = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = await GetSettingAsync("OpenRouterApiKey")
@@ -107,6 +116,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             requestBody["top_k"] = topK.Value;
         if (topA.HasValue)
             requestBody["top_a"] = topA.Value;
+        if (BuildReasoningPayload(reasoning) is { } reasoningPayload)
+            requestBody["reasoning"] = reasoningPayload;
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
         {
@@ -129,7 +140,7 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
             if (data == "[DONE]") break;
 
             string? content = null;
-            string? reasoning = null;
+            string? reasoningText = null;
             try
             {
                 var json = JsonDocument.Parse(data);
@@ -143,12 +154,12 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
                 if (delta.TryGetProperty("reasoning", out var reasoningElement) &&
                     reasoningElement.ValueKind == JsonValueKind.String)
                 {
-                    reasoning = reasoningElement.GetString();
+                    reasoningText = reasoningElement.GetString();
                 }
                 else if (delta.TryGetProperty("reasoning_content", out var rcElement) &&
                          rcElement.ValueKind == JsonValueKind.String)
                 {
-                    reasoning = rcElement.GetString();
+                    reasoningText = rcElement.GetString();
                 }
             }
             catch (JsonException)
@@ -156,10 +167,10 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
                 // Skip malformed chunks
             }
 
-            if (!string.IsNullOrEmpty(reasoning))
+            if (!string.IsNullOrEmpty(reasoningText))
             {
                 vault.RecordActivity();
-                yield return new StreamChunk(StreamChunkKind.Reasoning, reasoning);
+                yield return new StreamChunk(StreamChunkKind.Reasoning, reasoningText);
             }
             if (!string.IsNullOrEmpty(content))
             {

@@ -77,7 +77,7 @@ public sealed class GenerationManager
             await foreach (var chunk in openRouter.ChatStreamAsync(
                 st.ModelName, st.Prompt, draft.Messages.ToList(),
                 st.Temperature, st.TopP, st.MaxTokens,
-                st.MinP, st.TopK, st.TopA, gen.Cts.Token))
+                st.MinP, st.TopK, st.TopA, st.ReasoningEffort, gen.Cts.Token))
             {
                 _vault.RecordActivity();
                 gen.Append(chunk.Text, chunk.Kind == StreamChunkKind.Reasoning);

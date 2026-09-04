@@ -18,7 +18,8 @@ public static class StorytellerEndpoints
 
             return Results.Ok(new StorytellerDto(
                 s.Id, s.Name, s.Prompt, s.TitlingPrompt, s.ModelName,
-                s.Temperature, s.TopP, s.MaxTokens, s.MinP, s.TopK, s.TopA));
+                s.Temperature, s.TopP, s.MaxTokens, s.MinP, s.TopK, s.TopA,
+                s.ReasoningEffort));
         });
 
         group.MapPut("", async (StorytellerUpdateRequest body, FabulisDbContext db) =>
@@ -44,6 +45,7 @@ public static class StorytellerEndpoints
             s.MinP = body.MinP;
             s.TopK = body.TopK;
             s.TopA = body.TopA;
+            s.ReasoningEffort = body.ReasoningEffort;
 
             await db.SaveChangesAsync();
             return Results.NoContent();

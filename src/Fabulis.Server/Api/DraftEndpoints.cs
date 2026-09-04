@@ -123,7 +123,11 @@ public static class DraftEndpoints
                 draft.Storyteller.TitlingPrompt,
                 body,
                 temperature: 0.3,
-                disableReasoning: true);
+                // A title needs no chain-of-thought. Disabling reasoning keeps
+                // the call fast and cheap on hybrid/reasoning models, and —
+                // combined with no max_tokens cap — prevents reasoning tokens
+                // from consuming the whole budget and leaving an empty title.
+                reasoning: ReasoningEffort.Off);
 
             var title = TitleGeneration.CleanTitle(raw);
             if (string.IsNullOrWhiteSpace(title))

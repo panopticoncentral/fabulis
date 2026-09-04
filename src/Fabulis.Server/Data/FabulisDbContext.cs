@@ -66,6 +66,11 @@ public class FabulisDbContext : DbContext
         modelBuilder.Entity<Story>()
             .Property(s => s.SummaryStatus)
             .HasConversion<string>();
+
+        modelBuilder.Entity<Storyteller>()
+            .Property(s => s.ReasoningEffort)
+            .HasConversion<string>();
+
     }
 
     public async Task EnsureSchemaUpdatedAsync()
@@ -92,6 +97,7 @@ public class FabulisDbContext : DbContext
                 MinP REAL NULL,
                 TopK INTEGER NULL,
                 TopA REAL NULL,
+                ReasoningEffort TEXT NULL,
                 CreatedAt TEXT NOT NULL DEFAULT '0001-01-01 00:00:00'
             )
             """);
@@ -108,6 +114,14 @@ public class FabulisDbContext : DbContext
                 $"ALTER TABLE Storytellers ADD COLUMN TitlingPrompt TEXT NOT NULL DEFAULT '{titlingDefaultSql}'");
         }
 #pragma warning restore EF1002
+
+        // Storytellers gained ReasoningEffort after the initial release. Null
+        // preserves the previous behaviour of sending no reasoning field.
+        if (!storytellerColumns.Contains("ReasoningEffort"))
+        {
+            await Database.ExecuteSqlRawAsync(
+                "ALTER TABLE Storytellers ADD COLUMN ReasoningEffort TEXT NULL");
+        }
 
         await Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS AppSettings (

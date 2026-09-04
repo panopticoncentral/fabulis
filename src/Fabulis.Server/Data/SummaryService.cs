@@ -200,7 +200,7 @@ public sealed class SummaryService : BackgroundService
 
             var raw = await openRouter.ChatAsync(
                 model, prompt, userMessage,
-                temperature: 0.3, disableReasoning: true);
+                temperature: 0.3, reasoning: ReasoningEffort.Off);
             var summary = StorySummary.CleanSummary(raw);
 
             if (string.IsNullOrWhiteSpace(summary))
