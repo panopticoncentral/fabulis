@@ -112,6 +112,7 @@ struct DraftView: View {
             inputBar
         }
         .navigationTitle(draft?.title ?? "New Draft")
+        .modelSubtitle(draft?.modelName)
         .alert("Delete message?",
                isPresented: Binding(
                     get: { messagePendingDeletion != nil },
