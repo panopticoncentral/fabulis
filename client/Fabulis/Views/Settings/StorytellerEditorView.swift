@@ -19,6 +19,10 @@ struct StorytellerEditorView: View {
     @State private var savedAt: Date?
     @State private var errorMessage: String?
     @State private var showingDiscardConfirm = false
+    // load() must run exactly once. SwiftUI restarts .task whenever the view
+    // reappears — including on the pop back from the pushed model picker —
+    // and a second load would overwrite unsaved edits with the stored values.
+    @State private var didLoad = false
 
     // Snapshot of the loaded values (joined into one string over all fields),
     // to detect unsaved edits before the pushed editor is popped by Back.
@@ -105,7 +109,10 @@ struct StorytellerEditorView: View {
             Button("Discard Changes", role: .destructive) { dismiss() }
             Button("Keep Editing", role: .cancel) {}
         }
-        .task { await load() }
+        .task {
+            guard !didLoad else { return }
+            await load()
+        }
     }
 
     private var canSave: Bool {
@@ -130,6 +137,7 @@ struct StorytellerEditorView: View {
             topA = s.topA.map { String($0) } ?? ""
             reasoningEffort = s.reasoningEffort
             originalSignature = currentSignature
+            didLoad = true
         } catch {
             errorMessage = error.localizedDescription
         }
