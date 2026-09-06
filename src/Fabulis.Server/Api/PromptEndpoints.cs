@@ -17,6 +17,14 @@ public static class PromptEndpoints
 
         group.MapPost("", async (CreatePromptRequest body, PromptService prompts) =>
         {
+            // Title is optional here — a null/blank title falls back to "Untitled
+            // Prompt" in PromptService.CreatePromptAsync — but a *provided* title
+            // still becomes a path segment on export, so it must be validated.
+            // Trimmed, because PromptService is what stores it and it trims —
+            // see the note in LibraryEndpoints' category create.
+            var title = body.Title?.Trim();
+            if (!string.IsNullOrWhiteSpace(title) && !NameValidation.IsValidPathSegment(title))
+                return Results.BadRequest(new { error = NameValidation.Error("title") });
             if (!await prompts.CategoryExistsAsync(body.CategoryId))
                 return Results.BadRequest(new { error = "category does not exist" });
             var prompt = await prompts.CreatePromptAsync(body.CategoryId, body.Title);
@@ -28,6 +36,8 @@ public static class PromptEndpoints
         {
             if (string.IsNullOrWhiteSpace(body.Title))
                 return Results.BadRequest(new { error = "title is required" });
+            if (!NameValidation.IsValidPathSegment(body.Title.Trim()))
+                return Results.BadRequest(new { error = NameValidation.Error("title") });
             if (!await prompts.CategoryExistsAsync(body.CategoryId))
                 return Results.BadRequest(new { error = "category does not exist" });
             var updated = await prompts.UpdatePromptAsync(id, body.Title, body.CategoryId, body.Messages);

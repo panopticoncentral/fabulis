@@ -30,12 +30,17 @@ public static class StorytellerEndpoints
             {
                 return Results.BadRequest(new { error = "name, prompt, and modelName are required" });
             }
+            // Validated as it will be stored, i.e. trimmed — see the note in
+            // LibraryEndpoints' category create.
+            var name = body.Name.Trim();
+            if (!NameValidation.IsValidPathSegment(name))
+                return Results.BadRequest(new { error = NameValidation.Error("name") });
 
             var s = await db.Storytellers.OrderBy(x => x.Id).FirstOrDefaultAsync();
             if (s is null)
                 return Results.NotFound();
 
-            s.Name = body.Name.Trim();
+            s.Name = name;
             s.Prompt = body.Prompt;
             s.TitlingPrompt = body.TitlingPrompt;
             s.ModelName = body.ModelName.Trim();

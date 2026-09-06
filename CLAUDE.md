@@ -35,8 +35,8 @@ the server URL (e.g. `http://your-mac.local:5288`) and the vault password.
 Bulk import / export (CLI, runs on the server machine — see
 `src/Fabulis.Cli/README.md`):
 ```bash
-dotnet run --project src/Fabulis.Cli -- export <destination>
-dotnet run --project src/Fabulis.Cli -- import <source>
+dotnet run --project src/Fabulis.Cli -- export <destination> [--include-secrets]
+dotnet run --project src/Fabulis.Cli -- import <source> [--mirror] [--yes]
 ```
 
 ## Project structure
@@ -50,6 +50,8 @@ dotnet run --project src/Fabulis.Cli -- import <source>
     `OpenRouterService`, `VaultService`, `AutoLockService`
 - `src/Fabulis.Cli/` — bulk import/export CLI; project-references the
   server for entity types and `FabulisDbContext`
+- `tests/Fabulis.Cli.Tests/` — CLI unit tests (archive format primitives,
+  round-trip export/import, mirror semantics, flag parsing)
 - `client/Fabulis/`
   - `Models/APIDtos.swift` — Codable mirrors of server DTOs
   - `Services/` — `KeychainService` (serverURL + sessionToken),

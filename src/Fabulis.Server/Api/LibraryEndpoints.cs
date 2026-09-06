@@ -130,7 +130,14 @@ public static class LibraryEndpoints
         {
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest(new { error = "name is required" });
-            var cat = new Category { Name = body.Name.Trim(), CreatedAt = DateTime.UtcNow };
+            // Validate what will actually be stored. The validator rejects
+            // surrounding whitespace (Sanitize would strip it, desyncing the
+            // row from its directory), so checking the raw value would turn a
+            // trailing space — long accepted and quietly trimmed — into a 400.
+            var name = body.Name.Trim();
+            if (!NameValidation.IsValidPathSegment(name))
+                return Results.BadRequest(new { error = NameValidation.Error("name") });
+            var cat = new Category { Name = name, CreatedAt = DateTime.UtcNow };
             db.Categories.Add(cat);
             await db.SaveChangesAsync();
             return Results.Ok(new CategorySummaryDto(cat.Id, cat.Name, cat.CreatedAt, 0, null, 0, null, 0, null, 0, null));
@@ -140,9 +147,12 @@ public static class LibraryEndpoints
         {
             if (string.IsNullOrWhiteSpace(body.Name))
                 return Results.BadRequest(new { error = "name is required" });
+            var name = body.Name.Trim();
+            if (!NameValidation.IsValidPathSegment(name))
+                return Results.BadRequest(new { error = NameValidation.Error("name") });
             var cat = await db.Categories.FindAsync(id);
             if (cat is null) return Results.NotFound();
-            cat.Name = body.Name.Trim();
+            cat.Name = name;
             await db.SaveChangesAsync();
             return Results.NoContent();
         });

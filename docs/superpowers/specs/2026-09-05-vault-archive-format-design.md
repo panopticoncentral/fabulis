@@ -227,17 +227,28 @@ now so that the round-trip is genuinely lossless:
 
 Path segments derive from user- or model-supplied text. Sanitization replaces
 each run of `/`, `\` and control characters (U+0000–U+001F) with a single `-`,
-trims leading and trailing whitespace and dots, and falls back to `Untitled`
-when nothing survives. Collisions after sanitization get a ` (2)`, ` (3)`
-suffix, matching the convention already used by `SillyTavernConvertService`.
+trims leading whitespace and trailing whitespace, dots and dashes, and falls
+back to `Untitled` when nothing survives. Collisions after sanitization get a
+` (2)`, ` (3)` suffix, matching the convention already used by
+`SillyTavernConvertService`.
 Export warns on stderr whenever sanitization changed a name.
 
 Sanitization is a safety net for data already in the vault. Going forward the
-server prevents the situation: `LibraryEndpoints` gains validation rejecting
-path separators and control characters in category names and story titles, and
-`PromptEndpoints` and `StorytellerEndpoints` do the same for prompt titles and
-storyteller names — the four values that become path segments. Draft titles
-stay unvalidated, because a draft's authoritative title lives in front matter.
+server prevents the situation: `LibraryEndpoints` gains validation for category
+names and story titles, and `PromptEndpoints` and `StorytellerEndpoints` do the
+same for prompt titles and storyteller names — the four values that become path
+segments. Draft titles stay unvalidated, because a draft's authoritative title
+lives in front matter.
+
+The validation rejects exactly what sanitization would rewrite, so that an
+accepted name is written to disk verbatim and the row never desyncs from its
+directory: path separators and control characters anywhere in the name, a
+leading whitespace character, a trailing whitespace character, `.` or `-`, and
+the segments `.` and `..`. Endpoints validate the name they are about to store
+— i.e. after trimming — so surrounding whitespace is still forgiven rather than
+rejected. The rejection message names all of this; it is pinned by a test,
+since a message that described only the separator half would leave a user
+rejected for naming a category `Sci-Fi -` with nothing to act on.
 
 ## Import semantics
 
@@ -323,6 +334,14 @@ them:
 3. Story summaries (`SummaryText`, `SummaryStatus`, `SummarizedThroughVersion`,
    `SummaryError`, `SummaryUpdatedAt`) are not exported and regenerate.
 4. `OneLiner` and `Trope` `CreatedAt`/`UpdatedAt` reset to import time.
+5. Names are path-derived, so a name needing sanitization is rewritten on
+   round trip (e.g. "Sci-Fi / Fantasy" becomes "Sci-Fi - Fantasy"), and two
+   names that sanitize to the same stem get a NameAllocator " (2)" suffix.
+   Inherent to identity being the path.
+6. Message `SortOrder` is reindexed to 0..n on import. Relative order always
+   survives; the original absolute values do not.
+7. Leading and trailing blank or whitespace-only lines in message content are
+   stripped. Inner blank lines survive; the loss converges after one round.
 
 ## Out of scope
 

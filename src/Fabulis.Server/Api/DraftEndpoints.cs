@@ -89,7 +89,12 @@ public static class DraftEndpoints
             {
                 if (string.IsNullOrWhiteSpace(body.NewCategoryName))
                     return Results.BadRequest(new { error = "categoryId or newCategoryName is required" });
-                var newCat = new Category { Name = body.NewCategoryName.Trim(), CreatedAt = DateTime.UtcNow };
+                // Validated as it will be stored, i.e. trimmed — see the note
+                // in LibraryEndpoints' category create.
+                var newCategoryName = body.NewCategoryName.Trim();
+                if (!NameValidation.IsValidPathSegment(newCategoryName))
+                    return Results.BadRequest(new { error = NameValidation.Error("newCategoryName") });
+                var newCat = new Category { Name = newCategoryName, CreatedAt = DateTime.UtcNow };
                 db.Categories.Add(newCat);
                 await db.SaveChangesAsync();
                 categoryId = newCat.Id;
@@ -100,6 +105,8 @@ public static class DraftEndpoints
 
             if (storyId is null && string.IsNullOrWhiteSpace(newStoryTitle))
                 return Results.BadRequest(new { error = "storyId or newStoryTitle is required" });
+            if (!string.IsNullOrWhiteSpace(newStoryTitle) && !NameValidation.IsValidPathSegment(newStoryTitle))
+                return Results.BadRequest(new { error = NameValidation.Error("newStoryTitle") });
 
             var version = await drafts.SaveToLibraryAsync(id, categoryId, storyId, newStoryTitle);
             summaries.Enqueue(version.StoryId);

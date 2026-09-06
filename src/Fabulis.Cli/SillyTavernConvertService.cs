@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Fabulis.Cli.Archive;
 using Fabulis.Server.Data;
 
 namespace Fabulis.Cli;
@@ -30,11 +31,17 @@ public partial class SillyTavernConvertService
             throw new InvalidOperationException(
                 $"No .jsonl files found in '{sourcePath}'.");
 
-        var draftsDir = Path.Combine(destPath, "_drafts");
+        var draftsDir = Path.Combine(destPath, ArchiveLayout.DraftsDir);
         Directory.CreateDirectory(draftsDir);
 
+        // A drafts-only archive still needs the manifest: without it,
+        // `fabulis-cli import` refuses the directory outright.
+        await ArchiveLayout.WriteManifestAsync(destPath,
+            $"Drafts converted from SillyTavern chat logs. Only `{ArchiveLayout.DraftsDir}/` " +
+            "is populated; run `fabulis-cli import` on this directory to bring them into the vault.\n");
+
         var result = new ConvertResult();
-        var takenFileNames = new HashSet<string>(StringComparer.Ordinal);
+        var fileNames = new NameAllocator();
         foreach (var file in jsonlFiles)
         {
             List<ParsedTurn>? turns;
@@ -64,7 +71,6 @@ public partial class SillyTavernConvertService
                 continue;
             }
 
-            var modelName = DeriveModel(turns, file.FullName);
             var (createdUtc, updatedUtc) = DeriveTimestamps(turns, file);
 
             // Drop the greeting: the first non-user turn that precedes any user turn.
@@ -89,17 +95,28 @@ public partial class SillyTavernConvertService
                 bodyTurns.RemoveAt(greetingIndex);
 
             var title = DeriveTitle(bodyTurns);
-            var stamp = createdUtc.ToString("yyyyMMddTHHmmssZ");
-            var baseFileName = $"Draft {stamp} - {title}.md";
-            var fileName = MakeUniqueFileName(baseFileName, takenFileNames);
+
+            // Named and de-duplicated exactly as the full vault exporter does
+            // it: one definition of a draft's filename (and of the invariant
+            // culture the timestamp is formatted in) rather than a second,
+            // drifting copy here.
+            var desired = ArchiveLayout.DraftFileName(createdUtc, title);
+            var fileName = fileNames.Allocate(Path.GetFileNameWithoutExtension(desired)) + ".md";
 
             var messages = bodyTurns.Select((t, idx) => (
                 Role: t.IsUser ? MessageRole.Prompt : MessageRole.Response,
                 Content: t.Message,
                 SortOrder: idx));
 
-            var content = DraftMarkdownWriter.FormatDraft(
-                storytellerName, modelName, createdUtc, updatedUtc, messages);
+            var content = FrontMatter.Serialize(
+                [
+                    new("storyteller", storytellerName),
+                    new("title", title),
+                    new("created", FrontMatter.FormatTimestamp(createdUtc)),
+                    new("updated", FrontMatter.FormatTimestamp(updatedUtc)),
+                ],
+                ConversationFormat.Write(messages.Select(
+                    m => new ConversationFormat.Turn(m.Role, m.Content, m.SortOrder))));
 
             var outputPath = Path.Combine(draftsDir, fileName);
             await File.WriteAllTextAsync(outputPath, content);
@@ -206,21 +223,6 @@ public partial class SillyTavernConvertService
         return first;
     }
 
-    private static string DeriveModel(List<ParsedTurn> turns, string filePath)
-    {
-        var lastModel = turns
-            .Where(t => !t.IsUser && !string.IsNullOrWhiteSpace(t.ApiModel))
-            .Select(t => t.ApiModel!)
-            .LastOrDefault();
-
-        if (lastModel is null)
-        {
-            Console.Error.WriteLine($"warn: {filePath}: no model metadata, wrote 'Model: (unknown)'");
-            return "(unknown)";
-        }
-        return lastModel;
-    }
-
     private static (DateTime CreatedUtc, DateTime UpdatedUtc) DeriveTimestamps(
         List<ParsedTurn> turns, FileInfo file)
     {
@@ -282,21 +284,6 @@ public partial class SillyTavernConvertService
         truncated = TrailingPunctuation().Replace(truncated, "");
         if (string.IsNullOrWhiteSpace(truncated)) return "Untitled";
         return wasTruncated ? truncated + "…" : truncated;
-    }
-
-    private static string MakeUniqueFileName(string baseFileName, HashSet<string> taken)
-    {
-        if (taken.Add(baseFileName))
-            return baseFileName;
-
-        var stem = Path.GetFileNameWithoutExtension(baseFileName);
-        var ext = Path.GetExtension(baseFileName);
-        for (int n = 2; ; n++)
-        {
-            var candidate = $"{stem} ({n}){ext}";
-            if (taken.Add(candidate))
-                return candidate;
-        }
     }
 
     private record ParsedTurn(
