@@ -19,6 +19,7 @@ struct StorySummarySheet: View {
     @State private var pollTask: Task<Void, Never>?
     @State private var actionError: String?
     @State private var showingRegenerateConfirm = false
+    @State private var showingDiscardConfirm = false
 
     private var isBusy: Bool { awaitingRebuild || summary?.status == "generating" }
 
@@ -38,11 +39,19 @@ struct StorySummarySheet: View {
             .navigationTitle("Summary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if !isEditing {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     if isEditing {
-                        Button("Cancel") { isEditing = false }.fixedSize()
+                        Button("Cancel") {
+                            if editDraft != (summary?.text ?? "") { showingDiscardConfirm = true }
+                            else { isEditing = false }
+                        }.fixedSize().disabled(isSaving)
                     } else {
-                        Button("Done") { dismiss() }.fixedSize()
+                        EmptyView()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -67,7 +76,8 @@ struct StorySummarySheet: View {
             }
             // Editing holds unsaved text; block accidental swipe/Esc dismissal
             // while it differs from the saved summary.
-            .interactiveDismissDisabled(isEditing && editDraft != (summary?.text ?? ""))
+            .protectUnsavedChanges(isEditing && editDraft != (summary?.text ?? ""))
+            .discardChangesConfirmation(isPresented: $showingDiscardConfirm) { isEditing = false }
             .actionErrorAlert($actionError)
             .alert("Regenerate summary?", isPresented: $showingRegenerateConfirm) {
                 Button("Cancel", role: .cancel) {}
@@ -82,7 +92,7 @@ struct StorySummarySheet: View {
 
     @ViewBuilder
     private var content: some View {
-        if isBusy {
+        if isBusy && summary?.text == nil {
             VStack(spacing: 12) {
                 ProgressView()
                 Text("Generating summary…").foregroundStyle(.secondary)
@@ -101,6 +111,7 @@ struct StorySummarySheet: View {
             case "ready":
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
+                        if isBusy { ProgressView("Updating summary…") }
                         Text(summary.text ?? "").textSelection(.enabled)
                         if summary.isStale {
                             Text("A newer version exists — the summary will update shortly.")
@@ -111,6 +122,7 @@ struct StorySummarySheet: View {
             default: // "none"
                 VStack(spacing: 12) {
                     Text("No summary yet.").foregroundStyle(.secondary)
+                    Button("Generate Summary") { Task { await regenerate() } }
                     Text("One will be generated automatically.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
@@ -125,6 +137,8 @@ struct StorySummarySheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Edit summary").font(.caption).foregroundStyle(.secondary)
             TextEditor(text: $editDraft)
+                .accessibilityLabel("Summary text")
+                .disabled(isSaving)
                 .frame(maxHeight: .infinity)
                 .overlay(alignment: .topLeading) {
                     if isSaving { ProgressView().padding(6) }
@@ -142,6 +156,7 @@ struct StorySummarySheet: View {
 
     private func load() async {
         isLoading = true
+        errorMessage = nil
         do {
             summary = try await FabulisAPIClient.shared.storySummary(id: storyId)
         } catch {
@@ -184,9 +199,9 @@ struct StorySummarySheet: View {
         }
     }
 
-    /// Polls on first open only if the server is already mid-generation.
+    /// Observe missing, stale, and in-progress summaries while this sheet is open.
     private func startPollingIfNeeded() {
-        guard summary?.status == "generating" else { return }
+        guard summary?.status == "generating" || summary?.status == "none" || summary?.isStale == true else { return }
         startPolling(awaitingChangeFrom: summary?.updatedAt)
     }
 

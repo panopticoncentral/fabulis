@@ -44,6 +44,12 @@ public static class PromptEndpoints
             return updated is null ? Results.NotFound() : Results.Ok(ToDto(updated));
         });
 
+        group.MapPost("/{id:int}/draft", async (int id, DraftService drafts) =>
+        {
+            var draft = await drafts.CreateDraftFromPromptAsync(id);
+            return draft is null ? Results.NotFound() : Results.Ok(new { draftId = draft.Id });
+        });
+
         group.MapDelete("/{id:int}", async (int id, PromptService prompts) =>
         {
             return await prompts.DeletePromptAsync(id) ? Results.NoContent() : Results.NotFound();

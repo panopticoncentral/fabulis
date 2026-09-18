@@ -18,6 +18,30 @@ public class DraftService(FabulisDbContext db)
         return draft;
     }
 
+    public async Task<Draft?> CreateDraftFromPromptAsync(int promptId)
+    {
+        var prompt = await db.Prompts.Include(p => p.Messages).SingleOrDefaultAsync(p => p.Id == promptId);
+        if (prompt is null) return null;
+        var storytellerId = await db.Storytellers.Select(s => s.Id).SingleAsync();
+        var draft = new Draft
+        {
+            StorytellerID = storytellerId,
+            Title = prompt.Title,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            Messages = prompt.Messages.OrderBy(m => m.SortOrder)
+                .Select((m, index) => new DraftMessage
+                {
+                    Role = MessageRole.Prompt,
+                    Content = m.Content,
+                    SortOrder = index
+                }).ToList()
+        };
+        db.Drafts.Add(draft);
+        await db.SaveChangesAsync();
+        return draft;
+    }
+
     public async Task<List<Draft>> GetDraftsAsync()
     {
         return await db.Drafts

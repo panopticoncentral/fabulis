@@ -3,6 +3,13 @@ import SwiftUI
 @main
 struct FabulisApp: App {
     @State private var appState = AppState()
+    @FocusedValue(\.contentActions) private var contentActions
+
+    init() {
+        #if DEBUG
+        if UIFixtures.enabled { ReadingPreferences.store.removePersistentDomain(forName: "Fabulis.UIFixtures") }
+        #endif
+    }
 
     private var isReady: Bool { appState.phase == .ready }
 
@@ -26,6 +33,24 @@ struct FabulisApp: App {
                 Button("New Draft") { appState.newDraftRequested = true }
                     .keyboardShortcut("n", modifiers: .command)
                     .disabled(!isReady)
+            }
+            CommandGroup(replacing: .saveItem) {
+                Button("Save Changes") { contentActions?.saveChanges?() }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .disabled(!isReady || contentActions?.saveChanges == nil)
+                Button("Save to Library…") { contentActions?.saveToLibrary?() }
+                    .keyboardShortcut("s", modifiers: [.command, .shift])
+                    .disabled(!isReady || contentActions?.saveToLibrary == nil)
+            }
+            CommandMenu("Story") {
+                Button("Listen") { contentActions?.listen?() }
+                    .disabled(!isReady || contentActions?.listen == nil)
+                Button("Summary") { contentActions?.summary?() }
+                    .disabled(!isReady || contentActions?.summary == nil)
+                Divider()
+                Button("Refresh") { contentActions?.refresh?() }
+                    .keyboardShortcut("r", modifiers: .command)
+                    .disabled(!isReady || contentActions?.refresh == nil)
             }
             CommandGroup(after: .appSettings) {
                 Button("Lock Vault") { Task { await appState.lock() } }

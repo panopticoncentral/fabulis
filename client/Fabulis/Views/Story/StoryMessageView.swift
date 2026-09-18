@@ -23,23 +23,20 @@ struct StoryMessageView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(roleLabel.uppercased())
-                .font(.caption2.bold())
-                .foregroundStyle(roleColor)
+            HStack {
+                Text(roleLabel.uppercased()).font(.caption.bold()).foregroundStyle(roleColor)
+                Spacer()
+                if narrationAvailable, message.role == .response, let onPlayFromHere {
+                    Button("Listen from Here", systemImage: "play.circle", action: onPlayFromHere)
+                        .labelStyle(.iconOnly).touchTarget().help("Listen from here")
+                }
+            }
             Markdown(message.content)
                 .markdownTextStyle { FontSize(.em(1)) }
                 .textSelection(.enabled)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(message.role == .response ? Color.accentColor.opacity(0.06) : Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            if isCurrentlyPlaying {
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.accentColor, lineWidth: 2)
-            }
-        }
+        .messageSurface(role: message.role, highlighted: isCurrentlyPlaying)
+        .accessibilityValue(isCurrentlyPlaying ? "Currently playing" : "")
         .contextMenu {
             if narrationAvailable, message.role == .response, let onPlayFromHere {
                 Button { onPlayFromHere() } label: {

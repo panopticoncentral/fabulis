@@ -79,7 +79,6 @@ struct TextItemCategoryView<Item: TextLibraryItem, EditSheet: View>: View {
                 Button { Task { await load() } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .keyboardShortcut("r", modifiers: .command)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -94,7 +93,7 @@ struct TextItemCategoryView<Item: TextLibraryItem, EditSheet: View>: View {
             EditCategorySheet(
                 mode: .rename(id: categoryId),
                 initialName: name ?? categoryName,
-                onSaved: { Task { await load() } })
+                onSaved: { onChanged?(); Task { await load() } })
         }
         .alert("Delete category?",
                isPresented: $showingDeleteConfirm,
@@ -118,6 +117,7 @@ struct TextItemCategoryView<Item: TextLibraryItem, EditSheet: View>: View {
                },
                message: { _ in Text(config.deleteItemMessage) })
         .actionErrorAlert($actionError)
+        .focusedSceneValue(\.contentActions, ContentActions(refresh: { Task { await load() } }))
         .task { await load() }
         .refreshable { await load() }
     }
@@ -134,7 +134,7 @@ struct TextItemCategoryView<Item: TextLibraryItem, EditSheet: View>: View {
                 if adding {
                     ProgressView().controlSize(.mini)
                 } else {
-                    Image(systemName: "plus.circle.fill").font(.title2)
+                    Image(systemName: "plus.circle.fill").font(.title2).touchTarget()
                 }
             }
             .disabled(adding

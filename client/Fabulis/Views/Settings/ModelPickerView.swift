@@ -34,8 +34,8 @@ struct ModelPickerView: View {
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(model.id).font(.body.monospaced())
-                                Text(model.name).font(.caption).foregroundStyle(.secondary)
+                                Text(model.name).font(.body)
+                                Text(model.id).font(.caption.monospaced()).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if model.id == currentModel {

@@ -14,6 +14,7 @@ struct NarrationBar: View {
                 Spacer()
                 Button { player.dismissError() } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .touchTarget()
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityLabel("Dismiss")
@@ -22,7 +23,28 @@ struct NarrationBar: View {
             .padding(.vertical, 10)
             .background(.bar)
         } else {
-            HStack(spacing: 16) {
+            VStack(spacing: 2) {
+                HStack {
+                    Text(player.title).font(.caption.weight(.medium)).lineLimit(1)
+                    Spacer()
+                    if case .preparing = player.state { Text("Preparing audio…").font(.caption).foregroundStyle(.secondary) }
+                    Menu {
+                        ForEach([Float(0.75), 1, 1.25, 1.5, 2], id: \.self) { rate in
+                            Button(String(format: "%g×", rate)) { player.playbackRate = rate }
+                        }
+                    } label: { Text(String(format: "%g×", player.playbackRate)).font(.caption.monospacedDigit()).touchTarget() }
+                    .accessibilityLabel("Playback speed")
+                    .help("Playback speed")
+                }
+                .padding(.horizontal, 16)
+                if player.duration > 0 {
+                    Slider(value: Binding(get: { min(player.currentTime, player.duration) },
+                                          set: { player.seek(by: $0 - player.currentTime) }),
+                           in: 0...player.duration) { Text("Playback position") }
+                        .accessibilityValue(timeLabel)
+                        .padding(.horizontal, 16)
+                }
+                HStack(spacing: 8) {
                 Button { player.seek(by: -10) } label: {
                     Image(systemName: "gobackward.10")
                         .frame(minWidth: 44, minHeight: 44)
@@ -52,18 +74,9 @@ struct NarrationBar: View {
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    if let idx = player.currentBubbleIndex {
-                        Text("Part \(idx) of \(player.totalBubbles)")
-                            .font(.caption.weight(.medium))
-                    }
-                    Text(timeLabel)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-
                 Button { player.stop() } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .touchTarget()
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityLabel("Stop narration")
@@ -72,7 +85,25 @@ struct NarrationBar: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(.bar)
+                ViewThatFits(in: .horizontal) {
+                    HStack { playbackMetadata }
+                    VStack(spacing: 4) { playbackMetadata }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            }
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
         }
+    }
+
+    @ViewBuilder
+    private var playbackMetadata: some View {
+        if let idx = player.currentBubbleIndex {
+            Text("Part \(idx) of \(player.totalBubbles)").font(.caption.weight(.medium))
+        }
+        Text(timeLabel).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
     }
 
     private var isPlaying: Bool {

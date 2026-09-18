@@ -9,6 +9,7 @@ struct ServerUnreachableView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollView {
             VStack(spacing: 24) {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 56))
@@ -17,10 +18,11 @@ struct ServerUnreachableView: View {
                 if !serverURL.isEmpty {
                     Text(serverURL).font(.callout).foregroundStyle(.secondary)
                 }
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
+                Text("Check that your server is running and this device can reach it.")
+                    .foregroundStyle(.secondary).multilineTextAlignment(.center)
+                DisclosureGroup("Connection Details") {
+                    Text(message).font(.caption).textSelection(.enabled)
+                }
                 Button { Task { await retry() } } label: {
                     Group { if isRetrying { ProgressView() } else { Text("Try again") } }
                         .frame(maxWidth: .infinity)
@@ -38,6 +40,7 @@ struct ServerUnreachableView: View {
             .frame(maxWidth: 420)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
+            }
             .confirmationDialog("Disconnect from this server?",
                                 isPresented: $showingResetConfirm,
                                 titleVisibility: .visible) {

@@ -11,12 +11,16 @@ struct EditCategorySheet: View {
     @State private var name: String = ""
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var showingDiscardConfirm = false
+    @State private var didInitialize = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     TextField("Name", text: $name).textInputAutocapitalization(.words)
+                } footer: {
+                    Text("Categories are shared by stories, prompts, one-liners, and tropes.")
                 }
                 if let errorMessage {
                     Section { Text(errorMessage).foregroundStyle(.red) }
@@ -26,7 +30,7 @@ struct EditCategorySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.fixedSize()
+                    Button("Cancel") { if name != initialName { showingDiscardConfirm = true } else { dismiss() } }.fixedSize()
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
@@ -34,7 +38,10 @@ struct EditCategorySheet: View {
                         .fixedSize()
                 }
             }
-            .onAppear { name = initialName }
+            .protectUnsavedChanges(didInitialize && name != initialName)
+            .discardChangesConfirmation(isPresented: $showingDiscardConfirm) { dismiss() }
+            .presentationDetents([.medium])
+            .onAppear { if !didInitialize { name = initialName; didInitialize = true } }
         }
     }
 

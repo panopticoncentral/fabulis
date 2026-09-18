@@ -24,9 +24,9 @@ extension View {
     /// as opposed to a load failure. Action errors must not reuse the full-screen
     /// load-error state: once a view's primary data is on screen, replacing it
     /// with an error page to report a failed row delete loses the user's context.
-    func actionErrorAlert(_ error: Binding<String?>) -> some View {
+    func actionErrorAlert(_ error: Binding<String?>, title: String = "Couldn’t complete the action") -> some View {
         alert(
-            "Something went wrong",
+            title,
             isPresented: Binding(
                 get: { error.wrappedValue != nil },
                 set: { if !$0 { error.wrappedValue = nil } }),

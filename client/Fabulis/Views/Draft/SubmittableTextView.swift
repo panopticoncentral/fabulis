@@ -19,6 +19,7 @@ import UIKit
 /// submit too.
 struct PromptComposer: View {
     @Binding var text: String
+    var placeholder: String
     @Binding var isFocused: Bool
     /// False while a generation is streaming (and we're not editing): the field
     /// shows its text but rejects input, mirroring the old `.disabled(...)`.
@@ -39,6 +40,7 @@ struct PromptComposer: View {
     var body: some View {
         SubmittableTextView(
             text: $text,
+            placeholder: placeholder,
             isFocused: $isFocused,
             isEditable: isEditable,
             height: $height,
@@ -51,6 +53,7 @@ struct PromptComposer: View {
 
 struct SubmittableTextView: UIViewRepresentable {
     @Binding var text: String
+    var placeholder: String
     @Binding var isFocused: Bool
     var isEditable: Bool
     @Binding var height: CGFloat
@@ -59,7 +62,6 @@ struct SubmittableTextView: UIViewRepresentable {
     var onEscape: () -> Void
 
     static let maxLines = 5
-    static let placeholder = "Prompt"
     private static let inset = UIEdgeInsets(top: 7, left: 5, bottom: 7, right: 5)
     private static let lineFragmentPadding: CGFloat = 5
 
@@ -98,12 +100,12 @@ struct SubmittableTextView: UIViewRepresentable {
             (textView: ReturnInterceptingTextView, _) in
             textView.refreshBorderColor()
         }
-        view.accessibilityLabel = Self.placeholder
+        view.accessibilityLabel = placeholder
         view.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         // Placeholder, drawn inside the text container's content origin.
         let placeholder = UILabel()
-        placeholder.text = Self.placeholder
+        placeholder.text = self.placeholder
         placeholder.font = view.font
         placeholder.textColor = .placeholderText
         placeholder.adjustsFontForContentSizeCategory = true
@@ -144,6 +146,8 @@ struct SubmittableTextView: UIViewRepresentable {
         if view.isEditable != isEditable {
             DispatchQueue.main.async { view.isEditable = isEditable }
         }
+        view.placeholderLabel?.text = placeholder
+        view.accessibilityLabel = placeholder
         view.placeholderLabel?.isHidden = !text.isEmpty
         view.onReturn = onReturn
         view.onEscape = onEscape

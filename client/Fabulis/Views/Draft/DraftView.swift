@@ -12,19 +12,39 @@ struct DraftView: View {
     var onLibraryChanged: () -> Void = {}
 
     @State private var draft: DraftDetail?
-    @State private var prompt: String = ""
+    @Environment(AppState.self) private var appState
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State var composition: DraftComposition
+    private var prompt: String {
+        get { composition.text }
+        nonmutating set { composition.text = newValue }
+    }
     @State private var inFlightPrompt: String?
     @State private var streamingContent: String = ""
     @State private var isStreaming = false
     @State private var streamTask: Task<Void, Never>?
     @State private var errorMessage: String?
     @State private var showSaveSheet = false
-    @State private var editingMessage: DraftMessageDto?
-    @State private var stashedPrompt: String?
+    private var editingMessage: DraftMessageDto? {
+        get { composition.editingMessage }
+        nonmutating set { composition.editingMessage = newValue }
+    }
+    private var stashedPrompt: String? {
+        get { composition.stashedText }
+        nonmutating set { composition.stashedText = newValue }
+    }
+    @State private var showingResubmitConfirm = false
+    @State private var isSavingEdit = false
+    @State private var generationStatus = "Preparing response…"
     @State private var narrationAvailable = false
     @State private var messagePendingDeletion: DraftMessageDto?
     @State private var messagePendingRegenerate: DraftMessageDto?
-    @State private var player = NarrationPlayer()
+    private var player: NarrationPlayer { appState.narration }
+    private var narrationSource: String { "draft:\(draftId)" }
+    private var playingBubbleId: Int? {
+        appState.narrationSource == narrationSource ? player.currentBubbleId : nil
+    }
     /// Starts unset. `loadDraft` flips it to the .bottom edge once messages
     /// arrive — initializing with .bottom directly is a no-op (the ScrollView
     /// applies it against empty content, then sees no binding change when the
@@ -43,10 +63,15 @@ struct DraftView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         if let draft {
+                            if !draft.modelName.isEmpty {
+                                Text("Model: \(draft.modelName)")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                             ForEach(draft.messages, id: \.id) { msg in
                                 DraftMessageView(
                                     message: msg,
-                                    isCurrentlyPlaying: player.currentBubbleId == msg.id,
+                                    isCurrentlyPlaying: playingBubbleId == msg.id,
                                     isEditing: editingMessage?.id == msg.id,
                                     isDimmed: DraftEditLogic.isDimmed(
                                         draft.messages,
@@ -64,19 +89,20 @@ struct DraftView: View {
                                         Button {
                                             beginEdit(msg)
                                         } label: { Label("Edit", systemImage: "pencil") }
-                                            .disabled(isStreaming)
+                                            .disabled(isStreaming || editingMessage != nil)
                                     }
                                     if msg.role == .prompt, msg.id >= 0 {
                                         Button {
                                             requestRegenerate(msg)
                                         } label: { Label("Regenerate", systemImage: "arrow.clockwise") }
-                                            .disabled(isStreaming)
+                                            .disabled(isStreaming || editingMessage != nil)
                                     }
                                     if msg.id >= 0 {
                                         Divider()
                                         Button(role: .destructive) {
                                             messagePendingDeletion = msg
-                                        } label: { Label("Delete and after", systemImage: "trash") }
+                                        } label: { Label("Delete from Here…", systemImage: "trash") }
+                                            .disabled(isStreaming || editingMessage != nil)
                                     }
                                 }
                                 .id(msg.id)
@@ -87,7 +113,7 @@ struct DraftView: View {
                                 id: -1, role: .prompt, content: inFlightPrompt, sortOrder: Int.max))
                         }
                         if isStreaming {
-                            DraftMessageView(streamingResponse: streamingContent)
+                            DraftMessageView(streamingResponse: streamingContent, status: generationStatus)
                         }
                     }
                     .padding()
@@ -97,22 +123,25 @@ struct DraftView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .scrollPosition($scrollPosition, anchor: .bottom)
-                .onChange(of: player.currentBubbleId) { _, new in
+                .onChange(of: playingBubbleId) { _, new in
                     if let new {
-                        withAnimation { proxy.scrollTo(new, anchor: .center) }
+                        withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(new, anchor: .center) }
                     }
                 }
                 .overlay { draftPlaceholder }
             }
 
-            if let errorMessage {
+            if draft != nil, let errorMessage {
                 errorBanner(errorMessage)
             }
             Divider()
             inputBar
         }
-        .navigationTitle(draft?.title ?? "New Draft")
-        .modelSubtitle(draft?.modelName)
+        .navigationTitle(draft?.title ?? "Untitled Draft")
+        .navigationBarTitleDisplayMode(.inline)
+        .focusedSceneValue(\.contentActions, ContentActions(
+            saveChanges: editingMessage != nil && canSaveEdit ? { Task { await saveEdit() } } : nil,
+            saveToLibrary: !(draft?.messages.isEmpty ?? true) && !isStreaming && editingMessage == nil ? { showSaveSheet = true } : nil))
         .alert("Delete message?",
                isPresented: Binding(
                     get: { messagePendingDeletion != nil },
@@ -142,11 +171,16 @@ struct DraftView: View {
                     Text(regenerateWarning(for: msg))
                })
         .toolbar {
+            if let last = draft?.messages.last, last.role == .prompt {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Generate Response", systemImage: "sparkles") { requestRegenerate(last) }
+                        .disabled(isStreaming || editingMessage != nil)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Save") { showSaveSheet = true }
-                    .disabled((draft?.messages.isEmpty ?? true) || isStreaming)
-                    .keyboardShortcut("s", modifiers: .command)
-                    .fixedSize()
+                Button("Save to Library…", systemImage: "square.and.arrow.down") { showSaveSheet = true }
+                    .disabled((draft?.messages.isEmpty ?? true) || isStreaming || editingMessage != nil)
+                    .help("Save a story or a new version to the library")
             }
         }
         .sheet(isPresented: $showSaveSheet) {
@@ -155,22 +189,27 @@ struct DraftView: View {
         .task { await loadDraft() }
         .onDisappear {
             streamTask?.cancel()
-            player.stop()
-        }
-        .safeAreaInset(edge: .bottom) {
-            if player.isVisible {
-                NarrationBar(player: player)
-            }
         }
         .task { await loadNarrationAvailability() }
+        .alert("Regenerate from here?", isPresented: $showingResubmitConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Regenerate", role: .destructive) { Task { await resubmitEdit() } }
+        } message: {
+            if let editingMessage { Text(regenerateWarning(for: editingMessage)) }
+        }
     }
 
     /// Loading spinner while the draft is first fetched, and a starter empty
     /// state for a brand-new draft with nothing generating yet.
     @ViewBuilder
     private var draftPlaceholder: some View {
-        if draft == nil && errorMessage == nil {
-            ProgressView()
+        if draft == nil, let errorMessage {
+            LoadFailedView(title: "Couldn't load draft", message: errorMessage) {
+                self.errorMessage = nil
+                Task { await loadDraft() }
+            }
+        } else if draft == nil {
+            ProgressView("Loading draft…")
         } else if draft?.messages.isEmpty == true, inFlightPrompt == nil, !isStreaming {
             ContentUnavailableView("Start your story", systemImage: "sparkles",
                 description: Text("Type a prompt below to begin."))
@@ -186,26 +225,44 @@ struct DraftView: View {
                         role: editingMessage.role,
                         messagesAfter: DraftEditLogic.messagesAfter(
                             draft?.messages ?? [], editingId: editingMessage.id)))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
             HStack(alignment: .bottom, spacing: 8) {
                 PromptComposer(
-                    text: $prompt,
+                    text: Binding(get: { prompt }, set: { prompt = $0 }),
+                    placeholder: editingMessage?.role == .response ? "Edit response" : (editingMessage == nil ? "Write a prompt…" : "Edit prompt"),
                     isFocused: $promptFocused,
-                    isEditable: !(isStreaming && editingMessage == nil),
+                    isEditable: !isStreaming && !isSavingEdit && draft != nil,
                     onReturn: handleReturn,
                     handlesEscape: editingMessage != nil,
                     onEscape: cancelEdit)
                 if editingMessage == nil {
                     sendButton
-                } else {
+                } else if sizeClass != .compact {
                     editButtons
                 }
             }
+            if editingMessage != nil && sizeClass == .compact {
+                ViewThatFits(in: .horizontal) {
+                    HStack { Spacer(); editButtons }
+                    VStack(alignment: .trailing, spacing: 8) {
+                        HStack { cancelEditButton; Spacer(); saveEditButton }
+                        regenerateEditButton
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+            #if targetEnvironment(macCatalyst)
+            Text(editingMessage == nil ? "Return to send · Shift-Return for a new line" : "Return to save · Shift-Return for a new line")
+                .font(.caption).foregroundStyle(.secondary)
+            #endif
         }
         .padding()
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
     }
 
     private var sendButton: some View {
@@ -226,8 +283,10 @@ struct DraftView: View {
                 .padding(.horizontal, 4)
         }
         .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.circle)
+        .touchTarget()
         .tint(isStreaming ? .red : .accentColor)
-        .disabled(!isStreaming && prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        .disabled(!isStreaming && (draft == nil || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
         .accessibilityLabel(isStreaming ? "Stop generating" : "Send")
     }
 
@@ -244,6 +303,7 @@ struct DraftView: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.secondary)
+                    .touchTarget()
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dismiss error")
@@ -283,24 +343,44 @@ struct DraftView: View {
 
     @ViewBuilder
     private var editButtons: some View {
-        let canSave = !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        cancelEditButton
+        saveEditButton
+        regenerateEditButton
+    }
+
+    private var canSaveEdit: Bool {
+        !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSavingEdit && !isStreaming
+    }
+
+    private var cancelEditButton: some View {
         Button("Cancel") { cancelEdit() }
             .buttonStyle(.bordered)
-        Button("Save") { Task { await saveEdit() } }
+            .disabled(isSavingEdit)
+    }
+
+    private var saveEditButton: some View {
+        Button(isSavingEdit ? "Saving…" : "Save Changes") { Task { await saveEdit() } }
             .buttonStyle(.borderedProminent)
-            .disabled(!canSave)
+            .disabled(!canSaveEdit)
+    }
+
+    @ViewBuilder
+    private var regenerateEditButton: some View {
         if editingMessage?.role == .prompt {
             Button {
-                Task { await resubmitEdit() }
+                if let editingMessage, DraftEditLogic.messagesAfter(draft?.messages ?? [], editingId: editingMessage.id) > 0 {
+                    showingResubmitConfirm = true
+                } else { Task { await resubmitEdit() } }
             } label: {
-                Label("Resubmit", systemImage: "arrow.clockwise")
+                Label("Regenerate from Here…", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
-            .disabled(!canSave)
+            .disabled(!canSaveEdit)
         }
     }
 
     private func loadDraft() async {
+        errorMessage = nil
         do {
             draft = try await FabulisAPIClient.shared.getDraft(id: draftId)
             // Pin to the bottom edge. The ScrollView already laid out at
@@ -309,7 +389,7 @@ struct DraftView: View {
             // because that would already match this assignment, leaving the
             // binding unchanged and the scroll un-applied.
             scrollPosition.scrollTo(edge: .bottom)
-            promptFocused = true
+            promptFocused = draft?.messages.isEmpty == true || editingMessage != nil
             notifyDraftChanged()
         } catch {
             errorMessage = error.localizedDescription
@@ -339,21 +419,24 @@ struct DraftView: View {
     /// prompts and Return during streaming are no-ops. (Shift+Return never
     /// reaches here — it's handled by the field as a newline.)
     private func handleReturn() {
+        guard !isStreaming && !isSavingEdit else { return }
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if editingMessage != nil {
             Task { await saveEdit() }
             return
         }
-        guard !isStreaming else { return }
+        guard !isStreaming && !isSavingEdit else { return }
         Task { await submit() }
     }
 
     private func submit() async {
+        guard !isStreaming, draft != nil else { return }
         player.stop()
         let pending = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !pending.isEmpty else { return }
         prompt = ""
+        isStreaming = true
         let stream = await FabulisAPIClient.shared.streamMessage(draftId: draftId, prompt: pending)
         runStream(inFlight: pending, initial: stream)
     }
@@ -373,6 +456,8 @@ struct DraftView: View {
     }
 
     private func saveEdit() async {
+        guard !isSavingEdit else { return }
+        isSavingEdit = true; defer { isSavingEdit = false }
         guard let msg = editingMessage else { return }
         let content = prompt
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
@@ -393,13 +478,14 @@ struct DraftView: View {
         guard let msg = editingMessage else { return }
         let content = prompt
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        prompt = stashedPrompt ?? ""
-        stashedPrompt = nil
-        editingMessage = nil
         await editAndResubmit(messageId: msg.id, content: content)
+        // Retain the edit buffer until the server accepts and completes it.
+
     }
 
     private func editAndResubmit(messageId: Int, content: String) async {
+        guard !isStreaming else { return }
+        isStreaming = true
         player.stop()
         // Optimistically reflect the server-side mutation: rewrite the edited
         // message's content and drop everything after it. The streamed response
@@ -430,6 +516,7 @@ struct DraftView: View {
     private func runStream(inFlight: String?, initial: AsyncThrowingStream<StreamEnvelope, Error>?) {
         errorMessage = nil
         streamingContent = ""
+        generationStatus = "Preparing response…"
         inFlightPrompt = inFlight
         isStreaming = true
 
@@ -459,6 +546,7 @@ struct DraftView: View {
                         case "snapshot":
                             streamingContent = env.text ?? ""
                         case "chunk":
+                            generationStatus = "Generating…"
                             if env.reasoning != true, let text = env.text {
                                 streamingContent += text
                             }
@@ -484,6 +572,7 @@ struct DraftView: View {
                     break
                 } catch {
                     if Task.isCancelled { stoppedByUser = true; break }
+                    generationStatus = "Reconnecting…"
                     consecutiveFailures += 1
                     if consecutiveFailures >= maxFailures {
                         errorMessage = error.localizedDescription
@@ -535,7 +624,12 @@ struct DraftView: View {
                 notifyDraftChanged()
                 // Streaming content mutates silently for VoiceOver; announce the
                 // terminal state so it's perceivable without watching the screen.
-                if errorMessage == nil {
+                if errorMessage == nil, !stoppedByUser {
+                    if editingMessage != nil {
+                        prompt = stashedPrompt ?? ""
+                        stashedPrompt = nil
+                        editingMessage = nil
+                    }
                     AccessibilityNotification.Announcement("Response complete").post()
                 }
             }
@@ -564,6 +658,7 @@ struct DraftView: View {
         let responses = draft.messages
             .filter { $0.role == .response && $0.id >= 0 }
             .map { (id: $0.id, text: $0.content) }
+        appState.narrationSource = narrationSource
         player.start(bubbles: responses, from: bubbleId, title: draft.title)
     }
 }

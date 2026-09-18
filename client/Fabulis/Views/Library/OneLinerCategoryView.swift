@@ -19,7 +19,7 @@ struct OneLinerCategoryView: View {
                 searchPrompt: "Filter one-liners",
                 emptyIcon: "quote.bubble",
                 emptyTitle: "No one-liners",
-                emptyHint: "Type a line above and press Return to add one.",
+                emptyHint: "Write a line above, then choose Add.",
                 loadErrorTitle: "Couldn't load one-liners",
                 deleteItemTitle: "Delete one-liner?",
                 deleteItemMessage: "This deletes the one-liner. This cannot be undone.",

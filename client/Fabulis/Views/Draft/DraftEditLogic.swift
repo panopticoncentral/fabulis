@@ -18,13 +18,13 @@ enum DraftEditLogic {
         case .prompt:
             if messagesAfter == 0 { return "Editing prompt" }
             let noun = messagesAfter == 1 ? "message" : "messages"
-            return "Editing prompt \u{2014} Resubmit will delete \(messagesAfter) \(noun) after it"
+            return "Editing prompt \u{2014} Regenerating will delete \(messagesAfter) \(noun) after it"
         }
     }
 
     /// Whether `bubbleId` should be dimmed: true only when a prompt is being
     /// edited and this bubble sorts after the edited prompt (preview of what
-    /// Resubmit will remove). Editing a response never dims anything.
+    /// Regenerating will remove). Editing a response never dims anything.
     static func isDimmed(
         _ messages: [DraftMessageDto],
         editingId: Int?,

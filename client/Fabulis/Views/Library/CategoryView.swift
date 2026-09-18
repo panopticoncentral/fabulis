@@ -3,6 +3,9 @@ import SwiftUI
 struct CategoryView: View {
     let categoryId: Int
     let categoryName: String
+    var onChanged: (() -> Void)? = nil
+    /// Present when this list drives the content column of a split view.
+    var storySelection: Binding<StorySummary?>? = nil
     var onDeleted: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
@@ -22,7 +25,7 @@ struct CategoryView: View {
         return stories.filter { $0.title.lowercased().contains(q) }
     }
 
-    var body: some View {
+    private var categoryContent: some View {
         Group {
             if let detail {
                 if detail.stories.isEmpty {
@@ -31,13 +34,13 @@ struct CategoryView: View {
                 } else if filteredStories.isEmpty {
                     ContentUnavailableView.search(text: search)
                 } else {
-                    List(filteredStories) { story in
-                        NavigationLink(value: story) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(story.title).font(.body)
-                                Text(story.createdAt.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption2).foregroundStyle(.secondary)
-                            }
+                    if let storySelection {
+                        List(filteredStories, selection: storySelection) { story in
+                            NavigationLink(value: story) { storyRow(story) }
+                        }
+                    } else {
+                        List(filteredStories) { story in
+                            NavigationLink(value: story) { storyRow(story) }
                         }
                     }
                 }
@@ -48,17 +51,26 @@ struct CategoryView: View {
                                message: errorMessage) { Task { await load() } }
             }
         }
+    }
+
+    var body: some View {
+        Group {
+            if storySelection != nil {
+                // The split view owns the destination in its detail column.
+                categoryContent
+            } else {
+                categoryContent.navigationDestination(for: StorySummary.self) { story in
+                    StoryView(storyId: story.id, fallbackTitle: story.title)
+                }
+            }
+        }
         .navigationTitle(detail?.name ?? categoryName)
         .searchable(text: $search, prompt: "Filter stories")
-        .navigationDestination(for: StorySummary.self) { story in
-            StoryView(storyId: story.id, fallbackTitle: story.title)
-        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { Task { await load() } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .keyboardShortcut("r", modifiers: .command)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -73,7 +85,7 @@ struct CategoryView: View {
             EditCategorySheet(
                 mode: .rename(id: categoryId),
                 initialName: detail?.name ?? categoryName,
-                onSaved: { Task { await load() } })
+                onSaved: { onChanged?(); Task { await load() } })
         }
         .alert("Delete category?",
                isPresented: $showingDeleteConfirm,
@@ -85,8 +97,17 @@ struct CategoryView: View {
                     Text(LibraryCopy.deleteCategoryWarning)
                })
         .actionErrorAlert($actionError)
+        .focusedSceneValue(\.contentActions, ContentActions(refresh: { Task { await load() } }))
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    private func storyRow(_ story: StorySummary) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(story.title).font(.body)
+            Text(story.createdAt.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private func load() async {
@@ -94,7 +115,8 @@ struct CategoryView: View {
             errorMessage = nil
             detail = try await FabulisAPIClient.shared.category(id: categoryId)
         } catch {
-            errorMessage = error.localizedDescription
+            if detail == nil { errorMessage = error.localizedDescription }
+            else { actionError = error.localizedDescription }
         }
         isLoading = false
     }

@@ -3,22 +3,134 @@ import SwiftUI
 enum LibrarySelection: Hashable {
     case draft(id: Int)
     case category(id: Int, name: String)
+    var categoryID: Int? {
+        if case .category(let id, _) = self { return id }
+        return nil
+    }
+}
+
+private enum LibraryTab: String, CaseIterable {
+    case drafts, stories, resources
 }
 
 struct LibraryView: View {
     @Environment(AppState.self) private var appState
-    @State private var selectedKind: LibraryKind = .prompts
+    @State private var tab: LibraryTab = .drafts
+    @State private var creatingDraft = false
+    @State private var createError: String?
+    @State private var draftToOpen: Int?
+    @State private var libraryRevision = 0
+
+    private var tabSelection: Binding<LibraryTab> {
+        Binding(get: { tab }, set: { newTab in appState.navigate { tab = newTab } })
+    }
+
+    var body: some View {
+        Group {
+            #if targetEnvironment(macCatalyst)
+            browser(kind: .drafts, active: true)
+            #else
+            TabView(selection: tabSelection) {
+                browser(kind: .drafts, active: tab == .drafts)
+                    .tabItem { Label("Drafts", systemImage: "square.and.pencil") }.tag(LibraryTab.drafts)
+                browser(kind: .stories, active: tab == .stories)
+                    .tabItem { Label("Stories", systemImage: "books.vertical") }.tag(LibraryTab.stories)
+                browser(kind: .prompts, active: tab == .resources)
+                    .tabItem { Label("Resources", systemImage: "lightbulb") }.tag(LibraryTab.resources)
+            }
+            #endif
+        }
+        .sheet(isPresented: Binding(get: { appState.showSettings }, set: { appState.showSettings = $0 })) {
+            NavigationStack { SettingsView() }
+                .interactiveDismissDisabled(appState.hasUnsavedChanges)
+                .frame(idealWidth: 620, idealHeight: 650)
+        }
+        .confirmationDialog("Discard changes?", isPresented: Binding(
+            get: { appState.showingNavigationConfirmation },
+            set: { appState.showingNavigationConfirmation = $0 }), titleVisibility: .visible) {
+                Button("Discard Changes", role: .destructive) { appState.discardAndNavigate() }
+                Button("Keep Editing", role: .cancel) { appState.pendingNavigation = nil }
+        }
+        .onChange(of: appState.draftRequestedToOpen) { _, id in
+            guard let id else { return }
+            appState.draftRequestedToOpen = nil
+            tab = .drafts
+            libraryRevision += 1
+            draftToOpen = id
+        }
+        .onChange(of: appState.newDraftRequested) { _, requested in
+            guard requested else { return }
+            appState.newDraftRequested = false
+            appState.navigate { Task { await createDraft() } }
+        }
+        .actionErrorAlert($createError, title: "Couldn't create draft")
+    }
+
+    private func browser(kind: LibraryKind, active: Bool) -> some View {
+        LibraryBrowser(initialKind: kind, isActive: active, creatingDraft: creatingDraft,
+                       draftToOpen: draftToOpen, revision: libraryRevision,
+                       onLibraryChanged: { libraryRevision += 1 })
+    }
+
+    private func createDraft() async {
+        guard !creatingDraft else { return }
+        creatingDraft = true; defer { creatingDraft = false }
+        do {
+            let draft = try await FabulisAPIClient.shared.createDraft()
+            tab = .drafts
+            libraryRevision += 1
+            draftToOpen = draft.id
+        } catch { createError = error.localizedDescription }
+    }
+}
+
+private struct LibraryBrowser: View {
+    @Environment(AppState.self) private var appState
+    let isActive: Bool
+    let creatingDraft: Bool
+    let draftToOpen: Int?
+    let revision: Int
+    let onLibraryChanged: () -> Void
+    @State private var selectedKind: LibraryKind
+    @State private var selections: [LibraryKind: LibrarySelection] = [:]
+    @State private var searches: [LibraryKind: String] = [:]
+
+    init(initialKind: LibraryKind, isActive: Bool, creatingDraft: Bool, draftToOpen: Int?, revision: Int,
+         onLibraryChanged: @escaping () -> Void) {
+        self.isActive = isActive
+        self.creatingDraft = creatingDraft
+        self.draftToOpen = draftToOpen
+        self.revision = revision
+        self.onLibraryChanged = onLibraryChanged
+        _selectedKind = State(initialValue: initialKind)
+    }
+
+    private var guardedSelection: Binding<LibrarySelection?> {
+        Binding(get: { selection }, set: { newValue in appState.navigate { selection = newValue } })
+    }
+
+    private func selectKind(_ kind: LibraryKind) {
+        guard selectedKind != kind else { return }
+        appState.navigate {
+            selections[selectedKind] = selection
+            searches[selectedKind] = search
+            selectedKind = kind
+            selection = selections[kind]
+            search = searches[kind] ?? ""
+        }
+    }
     @State private var categories: [CategorySummary] = []
     @State private var drafts: [DraftSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var actionError: String?
-    @State private var creatingDraft = false
     @State private var selection: LibrarySelection?
     @State private var showingNewCategorySheet = false
     @State private var categoryPendingDeletion: CategorySummary?
     @State private var draftPendingDeletion: DraftSummary?
     @State private var search = ""
+    @State private var lastOpenedDraft: Int?
+    @State private var selectedStory: StorySummary?
 
     private var searchPrompt: String {
         selectedKind == .drafts ? "Filter drafts" : "Filter categories"
@@ -27,7 +139,7 @@ struct LibraryView: View {
     private var filteredDrafts: [DraftSummary] {
         let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return drafts }
-        return drafts.filter { ($0.title ?? "").lowercased().contains(q) }
+        return drafts.filter { ($0.title ?? "Untitled Draft").lowercased().contains(q) }
     }
 
     private var filteredCategories: [CategorySummary] {
@@ -37,27 +149,69 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        Group {
+        #if targetEnvironment(macCatalyst)
+        if selectedKind == .stories || selectedKind == .drafts {
+            NavigationSplitView {
+                sidebarPanel
+            } content: {
+                Group {
+                    if selectedKind == .drafts { draftListColumn }
+                    else { storyListColumn }
+                }
+                .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 420)
+            } detail: {
+                if selectedKind == .drafts {
+                    detail
+                } else {
+                    NavigationStack {
+                        if let selectedStory {
+                            StoryView(storyId: selectedStory.id, fallbackTitle: selectedStory.title).id(selectedStory.id)
+                        } else {
+                            ContentUnavailableView("Choose a story", systemImage: "book", description: Text("Select a story to start reading."))
+                        }
+                    }
+                }
+            }
+        } else { twoColumnBrowser }
+        #else
+        twoColumnBrowser
+        #endif
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if appState.narration.isVisible { NarrationBar(player: appState.narration) }
+        }
+    }
+
+    private var twoColumnBrowser: some View {
+        NavigationSplitView { sidebarPanel } detail: { detail }
+    }
+
+    private var sidebarPanel: some View {
             sidebar
-                .navigationTitle("Library")
-                .searchable(text: $search, prompt: searchPrompt)
+                .navigationTitle(selectedKind.label)
+                .librarySearch(text: $search, prompt: searchPrompt)
                 .toolbar { toolbarContent }
-                .onChange(of: selectedKind) { _, _ in selection = nil }
                 .sheet(isPresented: $showingNewCategorySheet) {
                     EditCategorySheet(mode: .create, initialName: "", onSaved: {
+                        onLibraryChanged()
                         Task { await load() }
                     })
                 }
-                .sheet(isPresented: Binding(
-                    get: { appState.showSettings },
-                    set: { appState.showSettings = $0 })) {
-                    NavigationStack { SettingsView() }
+                .onChange(of: draftToOpen) { _, id in
+                    guard isActive, let id, lastOpenedDraft != id else { return }
+                    lastOpenedDraft = id
+                    selectedKind = .drafts
+                    selection = .draft(id: id)
+                    Task { await load() }
                 }
-                .onChange(of: appState.newDraftRequested) { _, requested in
-                    guard requested else { return }
-                    appState.newDraftRequested = false
-                    Task { await createDraft() }
+                .onChange(of: isActive) { _, active in
+                    if active, selectedKind == .drafts, let draftToOpen, lastOpenedDraft != draftToOpen {
+                        lastOpenedDraft = draftToOpen
+                        selection = .draft(id: draftToOpen)
+                    }
                 }
+                .onChange(of: revision) { _, _ in Task { await load() } }
                 .alert("Delete category?",
                        isPresented: Binding(
                             get: { categoryPendingDeletion != nil },
@@ -69,8 +223,8 @@ struct LibraryView: View {
                                 Task { await deleteCategory(category) }
                             }
                        },
-                       message: { _ in
-                            Text(LibraryCopy.deleteCategoryWarning)
+                       message: { category in
+                            Text(LibraryCopy.deleteCategoryWarning(category))
                        })
                 .alert("Delete draft?",
                        isPresented: Binding(
@@ -89,61 +243,114 @@ struct LibraryView: View {
                 .actionErrorAlert($actionError)
                 .task { await load() }
                 .refreshable { await load() }
-        } detail: {
-            detail
+            .onChange(of: selection) { old, new in
+                if old?.categoryID != new?.categoryID { selectedStory = nil }
+            }
+    }
+
+    private var draftListColumn: some View {
+        VStack(spacing: 0) {
+            TextField("Filter drafts", text: $search)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Filter drafts")
+                .padding(8)
+            libraryList
+        }
+        .navigationTitle("Drafts")
+    }
+
+    @ViewBuilder
+    private var storyListColumn: some View {
+        if case .category(let id, let name) = selection {
+            CategoryView(categoryId: id, categoryName: name, onChanged: onLibraryChanged,
+                         storySelection: Binding(get: { selectedStory }, set: { story in
+                             appState.navigate { selectedStory = story }
+                         }), onDeleted: {
+                selection = nil
+                Task { await load() }
+            })
+            .id(id)
+        } else {
+            ContentUnavailableView("Choose a category", systemImage: "books.vertical",
+                description: Text("Browse your stories by category."))
         }
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            switch selectedKind {
-            case .drafts:
-                Button {
-                    Task { await createDraft() }
-                } label: {
-                    HStack(spacing: 4) {
-                        if creatingDraft { ProgressView().controlSize(.mini) }
-                        else { Image(systemName: "plus") }
-                        Text("New Draft")
+        ToolbarItem(placement: .primaryAction) {
+            Button { appState.newDraftRequested = true } label: {
+                Label("New Draft", systemImage: "square.and.pencil")
+            }
+            .disabled(creatingDraft)
+            .help("Start a new draft (⌘N)")
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                if selectedKind.hasCategories {
+                    Button { showingNewCategorySheet = true } label: {
+                        Label("New Category…", systemImage: "folder.badge.plus")
                     }
                 }
-                .disabled(creatingDraft)
-                .fixedSize()
-            case .stories, .prompts, .oneLiners, .tropes:
-                Button { showingNewCategorySheet = true } label: {
-                    Label("New Category", systemImage: "folder.badge.plus")
-                }
-                .fixedSize()
-            }
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { Task { await load() } } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            .keyboardShortcut("r", modifiers: .command)
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { appState.showSettings = true } label: {
-                Label("Settings", systemImage: "gear")
-            }
+                Button { Task { await load() } } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                Button { appState.showSettings = true } label: { Label("Settings…", systemImage: "gear") }
+            } label: { Label("Library Options", systemImage: "ellipsis.circle") }
+            .accessibilityIdentifier("library-options")
+            .help("Library options")
         }
     }
 
-    @ViewBuilder
     private var sidebar: some View {
         VStack(spacing: 0) {
-            Picker("Kind", selection: $selectedKind) {
-                ForEach(LibraryKind.allCases) { kind in
-                    Text(kind.label).tag(kind)
+            #if targetEnvironment(macCatalyst)
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach([LibraryKind.drafts, .stories, .prompts, .oneLiners, .tropes]) { kind in
+                    if kind == .prompts {
+                        Text("Resources").font(.caption).foregroundStyle(.secondary).padding(.top, 12)
+                    }
+                    Button { selectKind(kind) } label: {
+                        Label(kind.label, systemImage: kind.symbol)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                            .background(selectedKind == kind ? Color.accentColor.opacity(0.14) : .clear,
+                                        in: RoundedRectangle(cornerRadius: 6))
+                            // Plain buttons otherwise hit-test only the visible
+                            // label when this row's background is transparent.
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selectedKind == kind ? .isSelected : [])
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            sidebarList
+            .padding(12)
+            if selectedKind.hasCategories {
+                Divider()
+                TextField(searchPrompt, text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel(searchPrompt)
+                    .padding(8)
+                libraryList
+            } else {
+                Spacer(minLength: 0)
+            }
+            #else
+            if [.prompts, .oneLiners, .tropes].contains(selectedKind) {
+                Picker("Resource type", selection: Binding(get: { selectedKind }, set: selectKind)) {
+                    ForEach([LibraryKind.prompts, .oneLiners, .tropes]) { kind in
+                        Text(kind.label).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding(8)
+            }
+            libraryList
+            #endif
         }
+        .navigationSplitViewColumnWidth(min: 220, ideal: 270, max: 360)
+    }
+
+    private var libraryList: some View {
+        sidebarList
+            .focusedSceneValue(\.contentActions, isActive ? ContentActions(refresh: { Task { await load() } }) : nil)
     }
 
     @ViewBuilder
@@ -164,12 +371,15 @@ struct LibraryView: View {
     @ViewBuilder
     private var draftsList: some View {
         if drafts.isEmpty {
-            ContentUnavailableView("No drafts", systemImage: "doc.text",
-                description: Text("Choose \u{201C}New Draft\u{201D} to start a story."))
+            ContentUnavailableView {
+                Label("Start your first story", systemImage: "square.and.pencil")
+            } description: { Text("Create a draft and begin with an idea.") } actions: {
+                Button("New Draft") { appState.newDraftRequested = true }.buttonStyle(.borderedProminent)
+            }
         } else if filteredDrafts.isEmpty {
             ContentUnavailableView.search(text: search)
         } else {
-            List(selection: $selection) {
+            List(selection: guardedSelection) {
                 Section("\(filteredDrafts.count) Draft\(filteredDrafts.count == 1 ? "" : "s")") {
                     ForEach(filteredDrafts) { draft in
                         DraftRow(draft: draft)
@@ -197,13 +407,15 @@ struct LibraryView: View {
     @ViewBuilder
     private var categoriesList: some View {
         if categories.isEmpty {
-            ContentUnavailableView("No categories",
-                systemImage: "books.vertical",
-                description: Text(emptyCategoriesHint))
+            ContentUnavailableView {
+                Label("No categories", systemImage: "books.vertical")
+            } description: { Text(emptyCategoriesHint) } actions: {
+                Button("New Category") { showingNewCategorySheet = true }.buttonStyle(.borderedProminent)
+            }
         } else if filteredCategories.isEmpty {
             ContentUnavailableView.search(text: search)
         } else {
-            List(selection: $selection) {
+            List(selection: guardedSelection) {
                 ForEach(filteredCategories) { category in
                     CategoryRow(category: category, kind: selectedKind)
                         .tag(LibrarySelection.category(id: category.id, name: category.name))
@@ -247,8 +459,9 @@ struct LibraryView: View {
                         drafts[idx] = summary
                     }
                 }, onLibraryChanged: {
+                    onLibraryChanged()
                     Task { await load() }
-                })
+                }, composition: appState.composition(for: id))
                 .id(id)
             }
         case .category(let id, let name):
@@ -256,6 +469,7 @@ struct LibraryView: View {
                 switch selectedKind {
                 case .prompts:
                     PromptCategoryView(categoryId: id, categoryName: name, onChanged: {
+                        onLibraryChanged()
                         Task { await load() }
                     }, onDeleted: {
                         selection = nil
@@ -264,6 +478,7 @@ struct LibraryView: View {
                     .id(id)
                 case .oneLiners:
                     OneLinerCategoryView(categoryId: id, categoryName: name, onChanged: {
+                        onLibraryChanged()
                         Task { await load() }
                     }, onDeleted: {
                         selection = nil
@@ -272,6 +487,7 @@ struct LibraryView: View {
                     .id(id)
                 case .tropes:
                     TropeCategoryView(categoryId: id, categoryName: name, onChanged: {
+                        onLibraryChanged()
                         Task { await load() }
                     }, onDeleted: {
                         selection = nil
@@ -279,7 +495,7 @@ struct LibraryView: View {
                     })
                     .id(id)
                 default:
-                    CategoryView(categoryId: id, categoryName: name, onDeleted: {
+                    CategoryView(categoryId: id, categoryName: name, onChanged: onLibraryChanged, onDeleted: {
                         selection = nil
                         Task { await load() }
                     })
@@ -287,9 +503,9 @@ struct LibraryView: View {
                 }
             }
         case .none:
-            ContentUnavailableView("Select a draft or category",
-                systemImage: "books.vertical",
-                description: Text("Pick a category to read its stories, or open Drafts to keep working."))
+            ContentUnavailableView(selectedKind == .drafts ? "Choose a draft" : "Choose a category",
+                systemImage: selectedKind.symbol,
+                description: Text(selectedKind == .drafts ? "Continue writing, or create a new draft." : "Browse your \(selectedKind.label.lowercased()) by category."))
         }
     }
 
@@ -300,6 +516,9 @@ struct LibraryView: View {
             async let draftList = FabulisAPIClient.shared.listDrafts()
             categories = try await lib.categories
             drafts = try await draftList
+            if case .category(let id, _) = selection, let category = categories.first(where: { $0.id == id }) {
+                selection = .category(id: id, name: category.name)
+            }
         } catch {
             let message: String
             if case APIError.unauthorized = error { message = "Session expired." }
@@ -323,6 +542,7 @@ struct LibraryView: View {
         categories.removeAll { $0.id == category.id }
         do {
             try await FabulisAPIClient.shared.deleteCategory(id: category.id)
+            onLibraryChanged()
         } catch {
             actionError = error.localizedDescription
             await load()
@@ -342,18 +562,7 @@ struct LibraryView: View {
         }
     }
 
-    private func createDraft() async {
-        creatingDraft = true
-        defer { creatingDraft = false }
-        do {
-            let draft = try await FabulisAPIClient.shared.createDraft()
-            await load()
-            selectedKind = .drafts
-            selection = .draft(id: draft.id)
-        } catch {
-            actionError = error.localizedDescription
-        }
-    }
+
 }
 
 // Full value equality (not id-only): SwiftUI compares a row view's stored
@@ -386,5 +595,16 @@ extension DraftSummary: Hashable {
             && lhs.createdAt == rhs.createdAt
             && lhs.updatedAt == rhs.updatedAt
             && lhs.messageCount == rhs.messageCount
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func librarySearch(text: Binding<String>, prompt: String) -> some View {
+        #if targetEnvironment(macCatalyst)
+        self
+        #else
+        searchable(text: text, prompt: prompt)
+        #endif
     }
 }

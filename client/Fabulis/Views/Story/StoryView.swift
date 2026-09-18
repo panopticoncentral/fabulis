@@ -1,4 +1,5 @@
 import SwiftUI
+import MarkdownUI
 
 struct StoryView: View {
     let storyId: Int
@@ -12,7 +13,16 @@ struct StoryView: View {
     @State private var isLoadingStory = true
     @State private var isLoadingVersion = false
     @State private var narrationAvailable = false
-    @State private var player = NarrationPlayer()
+    @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("readingConversation", store: ReadingPreferences.store) private var showConversation = false
+    @AppStorage("readingTextSize", store: ReadingPreferences.store) private var readingTextSize = 18.0
+    @State private var actionError: String?
+    private var player: NarrationPlayer { appState.narration }
+    private var narrationSource: String { "story:\(storyId):\(selectedVersion ?? 0)" }
+    private var playingBubbleId: Int? {
+        appState.narrationSource == narrationSource ? player.currentBubbleId : nil
+    }
     @State private var showingSummary = false
 
     var body: some View {
@@ -24,14 +34,43 @@ struct StoryView: View {
                 } else if let versionDetail {
                     ScrollViewReader { proxy in
                         ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 12) {
-                                ForEach(versionDetail.messages) { message in
+                            LazyVStack(alignment: .leading, spacing: 20) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    if !showConversation {
+                                        Text(detail.title).font(.largeTitle.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                                    }
+                                    Text("Version \(selectedVersion ?? 1) · \(detail.categoryName)")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                    if let versionSource {
+                                        Text(versionSource)
+                                            .font(.caption).foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                                .padding(.bottom, showConversation ? 0 : 12)
+                                ForEach(versionDetail.messages.filter { showConversation || $0.role == .response }) { message in
+                                    if showConversation {
                                     StoryMessageView(
                                         message: message,
-                                        isCurrentlyPlaying: player.currentBubbleId == message.id,
+                                        isCurrentlyPlaying: playingBubbleId == message.id,
                                         narrationAvailable: narrationAvailable,
                                         onPlayFromHere: { startNarration(from: message.id) })
                                         .id(message.id)
+                                    } else {
+                                        Markdown(message.content)
+                                            .markdownTextStyle { FontSize(readingTextSize) }
+                                            .textSelection(.enabled)
+                                            .padding(.vertical, 8)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .background(playingBubbleId == message.id ? Color.accentColor.opacity(0.08) : .clear)
+                                            .accessibilityValue(playingBubbleId == message.id ? "Currently playing" : "")
+                                            .contextMenu {
+                                                if narrationAvailable {
+                                                    Button("Listen from Here", systemImage: "play.fill") { startNarration(from: message.id) }
+                                                }
+                                            }
+                                            .id(message.id)
+                                    }
                                 }
                             }
                             .padding()
@@ -40,9 +79,9 @@ struct StoryView: View {
                             .frame(maxWidth: 720)
                             .frame(maxWidth: .infinity)
                         }
-                        .onChange(of: player.currentBubbleId) { _, new in
+                        .onChange(of: playingBubbleId) { _, new in
                             if let new {
-                                withAnimation { proxy.scrollTo(new, anchor: .center) }
+                                withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(new, anchor: .center) }
                             }
                         }
                     }
@@ -64,30 +103,14 @@ struct StoryView: View {
             }
         }
         .navigationTitle(detail?.title ?? fallbackTitle)
-        .modelSubtitle(versionDetail?.modelName)
+        .navigationBarTitleDisplayMode(.inline)
+        .focusedSceneValue(\.contentActions, ContentActions(
+            refresh: { Task { await loadStory() } },
+            listen: narrationAvailable && versionDetail?.messages.contains(where: { $0.role == .response }) == true ? {
+                if let first = versionDetail?.messages.first(where: { $0.role == .response }) { startNarration(from: first.id) }
+            } : nil,
+            summary: detail != nil ? { showingSummary = true } : nil))
         .toolbar {
-            if let detail, !detail.versions.isEmpty, let selectedVersion {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(detail.versions) { version in
-                            Button {
-                                select(version: version.versionNumber)
-                            } label: {
-                                if version.versionNumber == selectedVersion {
-                                    Label("Version \(version.versionNumber)", systemImage: "checkmark")
-                                } else {
-                                    Text("Version \(version.versionNumber)")
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 2) {
-                            Text("Version \(selectedVersion)")
-                            Image(systemName: "chevron.down").font(.caption2)
-                        }
-                    }
-                }
-            }
             if versionDetail != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: shareText) {
@@ -97,30 +120,41 @@ struct StoryView: View {
                     .disabled(shareText.isEmpty)
                 }
             }
-            if detail != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { Task { await loadStory() } } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                    .keyboardShortcut("r", modifiers: .command)
+            if narrationAvailable, let first = versionDetail?.messages.first(where: { $0.role == .response }) {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Listen", systemImage: "play.circle") { startNarration(from: first.id) }
+                        .help("Listen to this story")
                 }
             }
-            if detail != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingSummary = true
-                    } label: {
-                        Image(systemName: "text.quote")
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if let detail, let selectedVersion {
+                        Picker("Version", selection: Binding(get: { selectedVersion }, set: select)) {
+                            ForEach(detail.versions) { version in
+                                Text("Version \(version.versionNumber)").tag(version.versionNumber)
+                            }
+                        }
                     }
-                    .accessibilityLabel("Summary")
-                }
+                    Picker("Presentation", selection: $showConversation) {
+                        Text("Read").tag(false)
+                        Text("Conversation").tag(true)
+                    }
+                    if !showConversation {
+                        ControlGroup {
+                            Button("Smaller Text", systemImage: "textformat.size.smaller") { readingTextSize = max(14, readingTextSize - 2) }
+                            Button("Larger Text", systemImage: "textformat.size.larger") { readingTextSize = min(32, readingTextSize + 2) }
+                        }
+                    }
+                    Divider()
+                    Button("Summary", systemImage: "text.quote") { showingSummary = true }
+                        .disabled(detail == nil)
+                    Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadStory() } }
+                } label: { Label("Reading Options", systemImage: "ellipsis.circle") }
+                .accessibilityIdentifier("reading-options")
+                .help("Reading options and story summary")
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            if player.isVisible {
-                NarrationBar(player: player)
-            }
-        }
+        .actionErrorAlert($actionError, title: "Couldn't refresh story")
         .sheet(isPresented: $showingSummary) {
             StorySummarySheet(storyId: storyId)
         }
@@ -129,7 +163,11 @@ struct StoryView: View {
             await loadNarrationAvailability()
         }
         .refreshable { await loadStory() }
-        .onDisappear { player.stop() }
+    }
+
+    private var versionSource: String? {
+        guard let versionDetail, !versionDetail.modelName.isEmpty else { return nil }
+        return "Model: \(versionDetail.modelName)"
     }
 
     /// The current version's prose (response messages), for ShareLink/export.
@@ -143,7 +181,7 @@ struct StoryView: View {
 
     private func select(version: Int) {
         guard version != selectedVersion else { return }
-        player.stop()
+        if appState.narrationSource == narrationSource { player.stop() }
         selectedVersion = version
         Task { await loadVersion(version) }
     }
@@ -162,7 +200,8 @@ struct StoryView: View {
                 await loadVersion(target)
             }
         } catch {
-            storyError = error.localizedDescription
+            if detail == nil { storyError = error.localizedDescription }
+            else { actionError = error.localizedDescription }
         }
         isLoadingStory = false
     }
@@ -170,14 +209,16 @@ struct StoryView: View {
     private func loadVersion(_ version: Int) async {
         isLoadingVersion = true
         versionError = nil
-        versionDetail = nil
+        let refreshingCurrentVersion = versionDetail?.versionNumber == version
+        if !refreshingCurrentVersion { versionDetail = nil }
         do {
             let result = try await FabulisAPIClient.shared.storyVersion(storyId: storyId, version: version)
             guard version == selectedVersion else { return }
             versionDetail = result
         } catch {
             guard version == selectedVersion else { return }
-            versionError = error.localizedDescription
+            if refreshingCurrentVersion { actionError = error.localizedDescription }
+            else { versionError = error.localizedDescription }
         }
         guard version == selectedVersion else { return }
         isLoadingVersion = false
@@ -194,6 +235,7 @@ struct StoryView: View {
         let responses = versionDetail.messages
             .filter { $0.role == .response }
             .map { (id: $0.id, text: $0.content) }
+        appState.narrationSource = narrationSource
         player.start(bubbles: responses, from: bubbleId, title: detail?.title ?? fallbackTitle)
     }
 }

@@ -44,7 +44,7 @@ struct PromptCategoryView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(prompt.title).font(.body)
                                     Text("\(prompt.messageCount) \(prompt.messageCount == 1 ? "message" : "messages")")
-                                        .font(.caption2).foregroundStyle(.secondary)
+                                        .font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
@@ -82,6 +82,7 @@ struct PromptCategoryView: View {
         .navigationDestination(item: $editingPromptId) { id in
             PromptEditorView(promptId: id, onSaved: {
                 editingPromptId = nil
+                onChanged?()
                 Task { await load() }
             })
         }
@@ -103,7 +104,6 @@ struct PromptCategoryView: View {
                 Button { Task { await load() } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .keyboardShortcut("r", modifiers: .command)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -118,7 +118,7 @@ struct PromptCategoryView: View {
             EditCategorySheet(
                 mode: .rename(id: categoryId),
                 initialName: detail?.name ?? categoryName,
-                onSaved: { Task { await load() } })
+                onSaved: { onChanged?(); Task { await load() } })
         }
         .alert("Delete category?",
                isPresented: $showingDeleteConfirm,
@@ -144,6 +144,7 @@ struct PromptCategoryView: View {
                     Text("This deletes the prompt and its messages. This cannot be undone.")
                })
         .actionErrorAlert($actionError)
+        .focusedSceneValue(\.contentActions, ContentActions(refresh: { Task { await load() } }))
         .task { await load() }
         .refreshable { await load() }
     }
@@ -153,7 +154,8 @@ struct PromptCategoryView: View {
             errorMessage = nil
             detail = try await FabulisAPIClient.shared.categoryPrompts(categoryId: categoryId)
         } catch {
-            errorMessage = error.localizedDescription
+            if detail == nil { errorMessage = error.localizedDescription }
+            else { actionError = error.localizedDescription }
         }
         isLoading = false
     }

@@ -9,18 +9,6 @@ delete it from here.
 
 ## Functional gaps
 
-### Prompt → draft conversion
-
-Prompts can be defined and viewed (own tab, category-grouped, dedicated
-editor), but there is no way to turn a prompt into a draft yet — i.e.
-seed a new draft's conversation from a prompt's user-side messages and
-hand it to a storyteller to generate from. Needs a "Start draft from
-prompt" action plus server support to materialize a `Draft` (and its
-`DraftMessage`s) from a `Prompt`.
-
-Originally deferred in the Prompts category plan
-(`docs/superpowers/plans/2026-06-03-prompts-category.md`).
-
 ### Reasoning chunks UI
 
 The SSE protocol carries reasoning chunks (`reasoning: true` envelope
@@ -30,32 +18,6 @@ client silently drops them in the `case "chunk":` branch of
 `DraftMessageView` would surface them.
 
 Originally deferred in the Phase 3 plan.
-
-### Streaming-resume on reconnect
-
-If the SSE connection drops mid-generation (long backgrounding, network
-blip), the client can't re-subscribe to the live stream. The server's
-cancellation handler still persists whatever streamed before the drop,
-so the partial response shows up on next draft open — but the live
-"watch it finish typing" experience is lost.
-
-Would need: a `GET /api/v1/drafts/{id}/stream` endpoint that tails the
-in-progress generation, plus client logic to detect a dropped stream
-and re-subscribe instead of giving up.
-
-Originally deferred in the Phase 3 plan.
-
-### Background narration playback
-
-Narration stops when you leave the story or draft view. A global
-mini-player + `AVAudioSession.Category.playback` survival across
-backgrounding, plus `MPNowPlayingInfoCenter` /
-`MPRemoteCommandCenter` wiring for lock-screen controls, would let
-you keep listening while browsing the library or with the screen
-off.
-
-Originally deferred in the narration v1 spec at
-`docs/superpowers/specs/2026-05-26-narration-design.md`.
 
 ### Summary failure backoff
 

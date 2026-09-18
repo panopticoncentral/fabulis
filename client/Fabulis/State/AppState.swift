@@ -24,8 +24,37 @@ final class AppState {
 
     /// Menu-bar command plumbing. The library owns the actual UI, so app-level
     /// commands (⌘, / ⌘N) route through these.
+    let narration = NarrationPlayer()
+    var narrationSource: String?
+    private var compositions: [Int: DraftComposition] = [:]
+    var dirtyEditors: Set<UUID> = []
+    var showingNavigationConfirmation = false
+    var pendingNavigation: (() -> Void)?
+    var hasUnsavedChanges: Bool { !dirtyEditors.isEmpty }
+
+    func composition(for id: Int) -> DraftComposition {
+        if let existing = compositions[id] { return existing }
+        let composition = DraftComposition()
+        compositions[id] = composition
+        return composition
+    }
+
+    func navigate(_ action: @escaping () -> Void) {
+        if hasUnsavedChanges { pendingNavigation = action; showingNavigationConfirmation = true }
+        else { action() }
+    }
+
+    func discardAndNavigate() {
+        let action = pendingNavigation
+        pendingNavigation = nil
+        showingNavigationConfirmation = false
+        dirtyEditors.removeAll()
+        action?()
+    }
+
     var showSettings = false
     var newDraftRequested = false
+    var draftRequestedToOpen: Int?
 
     private let keychain = KeychainService.shared
     private let api = FabulisAPIClient.shared
@@ -46,6 +75,9 @@ final class AppState {
     }
 
     private func performBootstrap() async {
+        #if DEBUG
+        if UIFixtures.enabled { phase = .ready; return }
+        #endif
         let savedURL: String?
         do {
             savedURL = try await keychain.loadServerURL()
@@ -81,11 +113,15 @@ final class AppState {
     func didReauthenticate() { phase = .ready }
 
     func lock() async {
+        narration.stop()
         try? await api.lock()
         phase = .needsAuth
     }
 
     func resetServer() async {
+        narration.stop()
+        compositions.removeAll()
+        dirtyEditors.removeAll()
         try? await api.lock()
         try? await keychain.deleteSessionToken()
         try? await keychain.deleteServerURL()

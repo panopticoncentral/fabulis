@@ -42,10 +42,10 @@ struct StorytellerEditorView: View {
                 TextField("Name", text: $name).textInputAutocapitalization(.words)
             }
             Section("System prompt") {
-                TextEditor(text: $prompt).frame(minHeight: 120)
+                TextEditor(text: $prompt).accessibilityLabel("Writing instructions").frame(minHeight: 120)
             }
             Section("Titling prompt") {
-                TextEditor(text: $titlingPrompt).frame(minHeight: 100)
+                TextEditor(text: $titlingPrompt).accessibilityLabel("Title instructions").frame(minHeight: 100)
             }
             Section {
                 NavigationLink {
@@ -66,7 +66,7 @@ struct StorytellerEditorView: View {
             } footer: {
                 Text("Reasoning applies to story generation only. Titles and summaries never use it.")
             }
-            Section("Sampling") {
+            Section("Creativity") {
                 HStack {
                     Text("Temperature")
                     Slider(value: $temperature, in: 0...2, step: 0.05) {
@@ -75,11 +75,18 @@ struct StorytellerEditorView: View {
                     .accessibilityValue(String(format: "%.2f", temperature))
                     Text(String(format: "%.2f", temperature)).font(.caption.monospacedDigit())
                 }
-                LabeledNumberField(label: "top_p (0-1)", value: $topP)
-                LabeledNumberField(label: "max_tokens", value: $maxTokens)
-                LabeledNumberField(label: "min_p (0-1)", value: $minP)
-                LabeledNumberField(label: "top_k (int)", value: $topK)
-                LabeledNumberField(label: "top_a (0-1)", value: $topA)
+            }
+            Section {
+                DisclosureGroup("Advanced Sampling") {
+                LabeledNumberField(label: "Top P (0–1)", value: $topP)
+                LabeledNumberField(label: "Maximum tokens", value: $maxTokens, integer: true)
+                LabeledNumberField(label: "Min P (0–1)", value: $minP)
+                LabeledNumberField(label: "Top K (integer)", value: $topK, integer: true)
+                LabeledNumberField(label: "Top A (0–1)", value: $topA)
+            }
+            }
+            if let validationError {
+                Section { Text(validationError).foregroundStyle(.red) }
             }
             if let savedAt {
                 Section { Text("Saved \(savedAt.formatted(date: .omitted, time: .standard))").font(.caption).foregroundStyle(.green) }
@@ -88,7 +95,9 @@ struct StorytellerEditorView: View {
                 Section { Text(errorMessage).foregroundStyle(.red) }
             }
         }
-        .disabled(isLoading)
+        .disabled(isLoading || isSaving)
+        .focusedSceneValue(\.contentActions, ContentActions(saveChanges: canSave && !isSaving ? { Task { await save() } } : nil))
+        .protectUnsavedChanges(hasChanges)
         .overlay { if isLoading { ProgressView().controlSize(.large) } }
         .navigationTitle("Storyteller")
         .navigationBarBackButtonHidden(hasChanges)
@@ -115,8 +124,12 @@ struct StorytellerEditorView: View {
         }
     }
 
+    private var validationError: String? {
+        SamplingValidation.error(topP: topP, maxTokens: maxTokens, minP: minP, topK: topK, topA: topA)
+    }
+
     private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        validationError == nil && existing != nil && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !modelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -145,6 +158,7 @@ struct StorytellerEditorView: View {
     }
 
     private func save() async {
+        guard canSave else { return }
         errorMessage = nil; isSaving = true; defer { isSaving = false }
         do {
             try await FabulisAPIClient.shared.updateStoryteller(StorytellerUpdateRequest(
@@ -153,11 +167,11 @@ struct StorytellerEditorView: View {
                 titlingPrompt: titlingPrompt,
                 modelName: modelName.trimmingCharacters(in: .whitespacesAndNewlines),
                 temperature: temperature,
-                topP: Double(topP),
-                maxTokens: Int(maxTokens),
-                minP: Double(minP),
-                topK: Int(topK),
-                topA: Double(topA),
+                topP: Double(topP.trimmingCharacters(in: .whitespacesAndNewlines)),
+                maxTokens: Int(maxTokens.trimmingCharacters(in: .whitespacesAndNewlines)),
+                minP: Double(minP.trimmingCharacters(in: .whitespacesAndNewlines)),
+                topK: Int(topK.trimmingCharacters(in: .whitespacesAndNewlines)),
+                topA: Double(topA.trimmingCharacters(in: .whitespacesAndNewlines)),
                 reasoningEffort: reasoningEffort))
             savedAt = Date()
             originalSignature = currentSignature
@@ -170,11 +184,12 @@ struct StorytellerEditorView: View {
 private struct LabeledNumberField: View {
     let label: String
     @Binding var value: String
+    var integer = false
 
     var body: some View {
         LabeledContent(label) {
-            TextField("blank = unset", text: $value)
-                .keyboardType(.decimalPad)
+            TextField("Model default", text: $value)
+                .keyboardType(integer ? .numberPad : .decimalPad)
                 .multilineTextAlignment(.trailing)
         }
     }

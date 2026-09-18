@@ -11,6 +11,16 @@ enum LibraryKind: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var symbol: String {
+        switch self {
+        case .drafts: "square.and.pencil"
+        case .stories: "books.vertical"
+        case .prompts: "text.bubble"
+        case .oneLiners: "quote.bubble"
+        case .tropes: "theatermasks"
+        }
+    }
+
     var label: String {
         switch self {
         case .drafts: "Drafts"

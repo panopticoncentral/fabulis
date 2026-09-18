@@ -11,6 +11,7 @@ struct UnlockPromptView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollView {
             VStack(spacing: 24) {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 56))
@@ -46,6 +47,7 @@ struct UnlockPromptView: View {
             .frame(maxWidth: 420)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
+            }
             .confirmationDialog("Disconnect from this server?",
                                 isPresented: $showingResetConfirm,
                                 titleVisibility: .visible) {

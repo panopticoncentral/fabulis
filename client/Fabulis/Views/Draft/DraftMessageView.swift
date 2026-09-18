@@ -8,6 +8,7 @@ struct DraftMessageView<Menu: View>: View {
     let isCurrentlyPlaying: Bool
     let isEditing: Bool
     let isDimmed: Bool
+    var status = "Generating…"
     let menu: () -> Menu
 
     init(
@@ -26,7 +27,8 @@ struct DraftMessageView<Menu: View>: View {
         self.menu = menu
     }
 
-    init(streamingResponse content: String, @ViewBuilder menu: @escaping () -> Menu) {
+    init(streamingResponse content: String, status: String = "Generating…", @ViewBuilder menu: @escaping () -> Menu) {
+        self.status = status
         self.role = .response
         self.content = content
         self.isStreaming = true
@@ -47,25 +49,27 @@ struct DraftMessageView<Menu: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text(roleLabel.uppercased())
-                    .font(.caption2.bold())
+                    .font(.caption.bold())
                     .foregroundStyle(role == .response ? Color.accentColor : .secondary)
-                if isStreaming { ProgressView().controlSize(.mini) }
+                if isStreaming {
+                    ProgressView().controlSize(.mini)
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if Menu.self != EmptyView.self {
+                    SwiftUI.Menu(content: menu) {
+                        Image(systemName: "ellipsis").touchTarget()
+                    }
+                    .accessibilityLabel("Message actions")
+                    .help("Edit, listen, or regenerate this message")
+                }
             }
             Markdown(content)
                 .markdownTextStyle { FontSize(.em(1)) }
                 .textSelection(.enabled)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(role == .response ? Color.accentColor.opacity(0.06) : Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .opacity(isDimmed ? 0.4 : 1)
-        .overlay {
-            if isEditing || isCurrentlyPlaying {
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.accentColor, lineWidth: 2)
-            }
-        }
+        .messageSurface(role: role, highlighted: isEditing || isCurrentlyPlaying, dimmed: isDimmed)
+        .accessibilityValue(isEditing ? "Editing" : (isCurrentlyPlaying ? "Currently playing" : ""))
         .contextMenu { menu() }
     }
 }
@@ -84,7 +88,7 @@ extension DraftMessageView where Menu == EmptyView {
             isDimmed: isDimmed,
             menu: { EmptyView() })
     }
-    init(streamingResponse content: String) {
-        self.init(streamingResponse: content, menu: { EmptyView() })
+    init(streamingResponse content: String, status: String = "Generating…") {
+        self.init(streamingResponse: content, status: status, menu: { EmptyView() })
     }
 }

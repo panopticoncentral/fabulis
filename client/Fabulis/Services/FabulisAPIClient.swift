@@ -179,6 +179,12 @@ actor FabulisAPIClient {
         return try await request("PUT", path: "/prompts/\(id)", body: body, authed: true)
     }
 
+    func createDraftFromPrompt(id: Int) async throws -> Int {
+        struct CreatedDraft: Decodable { let draftId: Int }
+        let created: CreatedDraft = try await request("POST", path: "/prompts/\(id)/draft", authed: true)
+        return created.draftId
+    }
+
     func deletePrompt(id: Int) async throws {
         try await requestVoid("DELETE", path: "/prompts/\(id)", authed: true)
     }
@@ -490,6 +496,9 @@ actor FabulisAPIClient {
     }
 
     private func request<T: Decodable, B: Encodable>(_ method: String, path: String, body: B?, authed: Bool, timeout: TimeInterval? = nil) async throws -> T {
+        #if DEBUG
+        if UIFixtures.enabled { return try decoder.decode(T.self, from: UIFixtures.response(method, path: path)) }
+        #endif
         var req = try await buildRequest(method: method, path: path, body: body, authed: authed)
         if let timeout { req.timeoutInterval = timeout }
         let (data, response) = try await transport(req)
@@ -498,12 +507,18 @@ actor FabulisAPIClient {
     }
 
     private func requestVoid(_ method: String, path: String, authed: Bool) async throws {
+        #if DEBUG
+        if UIFixtures.enabled { return }
+        #endif
         let req = try await buildRequest(method: method, path: path, body: Optional<EmptyBody>.none, authed: authed)
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
     }
 
     private func requestVoid<B: Encodable>(_ method: String, path: String, body: B, authed: Bool) async throws {
+        #if DEBUG
+        if UIFixtures.enabled { return }
+        #endif
         let req = try await buildRequest(method: method, path: path, body: body, authed: authed)
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
@@ -514,6 +529,9 @@ actor FabulisAPIClient {
     }
 
     private func buildRequest<B: Encodable>(method: String, path: String, body: B?, authed: Bool) async throws -> URLRequest {
+        #if DEBUG
+        if UIFixtures.enabled { throw APIError.server(status: 501, body: "This action is unavailable in UI fixtures.") }
+        #endif
         guard let serverURL = try await keychain.loadServerURL() else { throw APIError.notConfigured }
         guard var components = URLComponents(string: serverURL) else { throw APIError.invalidURL }
         let trimmedExisting = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
@@ -581,6 +599,9 @@ actor FabulisAPIClient {
     /// an Authorization header — which lets AVPlayer fetch it via its
     /// native HTTP path with no special configuration.
     func playNarrationURL(token: String) async throws -> URL {
+        #if DEBUG
+        if UIFixtures.enabled { throw APIError.server(status: 501, body: "This action is unavailable in UI fixtures.") }
+        #endif
         guard let serverURL = try await keychain.loadServerURL() else { throw APIError.notConfigured }
         guard var components = URLComponents(string: serverURL) else { throw APIError.invalidURL }
         let trimmed = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path

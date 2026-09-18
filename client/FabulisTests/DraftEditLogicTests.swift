@@ -33,9 +33,9 @@ struct DraftEditLogicTests {
 
     @Test func bannerTextForPromptPluralizes() {
         #expect(DraftEditLogic.bannerText(role: .prompt, messagesAfter: 1)
-                == "Editing prompt \u{2014} Resubmit will delete 1 message after it")
+                == "Editing prompt \u{2014} Regenerating will delete 1 message after it")
         #expect(DraftEditLogic.bannerText(role: .prompt, messagesAfter: 3)
-                == "Editing prompt \u{2014} Resubmit will delete 3 messages after it")
+                == "Editing prompt \u{2014} Regenerating will delete 3 messages after it")
     }
 
     @Test func dimmedOnlyForBubblesAfterAnEditedPrompt() {

@@ -16,8 +16,14 @@ struct TropeEditSheet: View {
     @State private var saving = false
     @State private var errorMessage: String?
     @State private var showingDeleteConfirm = false
+    @State private var showingDiscardConfirm = false
+    private let originalText: String
+    private let originalCategoryId: Int
+    private var hasChanges: Bool { text != originalText || categoryId != originalCategoryId }
 
     init(trope: TropeSummary, categoryId: Int, onChanged: (() -> Void)? = nil) {
+        originalText = trope.text
+        originalCategoryId = categoryId
         self.tropeId = trope.id
         self.onChanged = onChanged
         _text = State(initialValue: trope.text)
@@ -50,7 +56,7 @@ struct TropeEditSheet: View {
             .navigationTitle("Edit Trope")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.fixedSize()
+                    Button("Cancel") { if hasChanges { showingDiscardConfirm = true } else { dismiss() } }.fixedSize().disabled(saving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
@@ -63,6 +69,9 @@ struct TropeEditSheet: View {
                     .fixedSize()
                 }
             }
+            .protectUnsavedChanges(hasChanges)
+            .discardChangesConfirmation(isPresented: $showingDiscardConfirm) { dismiss() }
+            .disabled(saving)
             .overlay { if isLoading { ProgressView() } }
             .alert("Delete trope?", isPresented: $showingDeleteConfirm) {
                 Button("Cancel", role: .cancel) {}
@@ -70,7 +79,7 @@ struct TropeEditSheet: View {
             } message: {
                 Text("This deletes the trope. This cannot be undone.")
             }
-            .alert("Couldn't save", isPresented: Binding(
+            .alert("Couldn't update trope", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}
@@ -78,6 +87,7 @@ struct TropeEditSheet: View {
                 Text(errorMessage ?? "")
             }
             .task { await load() }
+            .presentationDetents([.medium, .large])
         }
     }
 

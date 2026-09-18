@@ -3,7 +3,7 @@ import Foundation
 import MediaPlayer
 import Observation
 
-/// Per-view audio player for a story or draft. For each response bubble:
+/// Session audio player for a story or draft. For each response bubble:
 ///   1. Hit POST /narration/prepare with the text → get a one-shot token.
 ///   2. Build a GET URL with that token and let AVPlayer fetch it natively.
 /// AVPlayer streams the chunked MP3 directly over HTTP — playback begins
@@ -27,6 +27,13 @@ final class NarrationPlayer: NSObject {
         case paused(bubbleId: Int)
     }
 
+    var playbackRate: Float = 1 {
+        didSet {
+            if case .playing = state { player?.rate = playbackRate }
+            updateNowPlayingInfo()
+        }
+    }
+    var title: String { narrationTitle }
     private(set) var state: State = .idle
     private(set) var currentTime: TimeInterval = 0
     /// 0 when the duration isn't yet known (streaming, parser hasn't
@@ -93,7 +100,7 @@ final class NarrationPlayer: NSObject {
             stopTimer()
             updateNowPlayingInfo()
         case .paused(let id):
-            player?.play()
+            player?.playImmediately(atRate: self.playbackRate)
             state = .playing(bubbleId: id)
             startTimer()
             updateNowPlayingInfo()
@@ -390,7 +397,7 @@ final class NarrationPlayer: NSObject {
                 case .readyToPlay:
                     if case .preparing = self.state {
                         self.state = .playing(bubbleId: bubbleId)
-                        self.player?.play()
+                        self.player?.playImmediately(atRate: self.playbackRate)
                         self.startTimer()
                         self.updateNowPlayingInfo()
                     }

@@ -19,7 +19,7 @@ struct TropeCategoryView: View {
                 searchPrompt: "Filter tropes",
                 emptyIcon: "theatermasks",
                 emptyTitle: "No tropes",
-                emptyHint: "Type a fragment above and press Return to add one.",
+                emptyHint: "Write a fragment above, then choose Add.",
                 loadErrorTitle: "Couldn't load tropes",
                 deleteItemTitle: "Delete trope?",
                 deleteItemMessage: "This deletes the trope. This cannot be undone.",

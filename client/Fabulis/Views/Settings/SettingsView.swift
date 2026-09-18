@@ -1,6 +1,38 @@
 import SwiftUI
 
+private enum SettingsPane: String, CaseIterable, Identifiable {
+    case general = "General", writing = "Writing", narration = "Narration", connection = "Connection & Vault"
+    var id: String { rawValue }
+    var symbol: String {
+        switch self {
+        case .general: "gear"
+        case .writing: "square.and.pencil"
+        case .narration: "speaker.wave.2"
+        case .connection: "lock.shield"
+        }
+    }
+}
+
 struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    var body: some View {
+        List(SettingsPane.allCases) { pane in
+            NavigationLink { SettingsPaneView(pane: pane) } label: {
+                Label(pane.rawValue, systemImage: pane.symbol)
+            }
+        }
+        .navigationTitle("Settings")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }.disabled(appState.hasUnsavedChanges)
+            }
+        }
+    }
+}
+
+private struct SettingsPaneView: View {
+    let pane: SettingsPane
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
@@ -18,6 +50,12 @@ struct SettingsView: View {
     @State private var speedDraft: Double = 1.0
     @State private var summaryPromptDraft: String = ""
     @State private var summaryPromptJustSaved = false
+    @State private var didLoad = false
+    @State private var showingDiscardConfirm = false
+    @State private var isSavingSummaryPrompt = false
+    private var hasChanges: Bool {
+        didLoad && (!apiKeyDraft.isEmpty || !kokoroUrlDraft.isEmpty || summaryPromptDraft != (settings?.summaryPrompt ?? ""))
+    }
 
     private let autoLockOptions: [(label: String, value: String)] = [
         ("1 minute", "1"), ("5 minutes", "5"), ("15 minutes", "15"),
@@ -25,26 +63,101 @@ struct SettingsView: View {
     ]
 
     var body: some View {
-        Form {
-            Section("Server") { LabeledContent("URL", value: serverURL) }
-
-            Section("OpenRouter API key") {
-                if let settings, settings.apiKeyIsSet { Text("Key is set").foregroundStyle(.secondary) }
-                SecureField("sk-or-...", text: $apiKeyDraft)
-                Button {
-                    Task { await saveApiKey() }
-                } label: {
-                    HStack {
-                        if isSavingApiKey { ProgressView().controlSize(.mini) }
-                        Text("Save key")
+        Group {
+            if isLoading { ProgressView("Loading settings…") }
+            else if settings == nil {
+                LoadFailedView(title: "Couldn't load settings", message: errorMessage ?? "Try again.") { Task { await load() } }
+            } else {
+                Form {
+                    switch pane {
+                    case .general: generalSettings
+                    case .writing: writingSettings
+                    case .narration: narrationSettings
+                    case .connection: connectionSettings
+                    }
+                    if let errorMessage {
+                        Section { Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
                     }
                 }
-                .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSavingApiKey)
-                if apiKeyJustSaved {
-                    Text("API key saved.").font(.caption).foregroundStyle(.green)
+            }
+        }
+        .navigationTitle(pane.rawValue)
+        .navigationBarBackButtonHidden(hasChanges)
+        .protectUnsavedChanges(hasChanges)
+        .toolbar {
+            if hasChanges {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showingDiscardConfirm = true }
+                }
+            }
+        }
+        .discardChangesConfirmation(isPresented: $showingDiscardConfirm) { dismiss() }
+        .onChange(of: apiKeyDraft) { _, value in if !value.isEmpty { apiKeyJustSaved = false } }
+        .onChange(of: kokoroUrlDraft) { _, value in if !value.isEmpty { kokoroUrlJustSaved = false } }
+        .onChange(of: summaryPromptDraft) { _, _ in summaryPromptJustSaved = false }
+        .task { if !didLoad { await load() } }
+    }
+
+    private var generalSettings: some View {
+        Group {
+            Section("Auto-lock") {
+                if let settings {
+                    Picker("After", selection: Binding(
+                        get: { settings.autoLockSelection },
+                        set: { newValue in Task { await saveAutoLock(newValue) } }
+                    )) {
+                        ForEach(autoLockOptions, id: \.value) { opt in
+                            Text(opt.label).tag(opt.value)
+                        }
+                    }
                 }
             }
 
+        }
+    }
+
+    private var writingSettings: some View {
+        Group {
+            Section("Storyteller") {
+                NavigationLink("Edit storyteller", destination: StorytellerEditorView())
+            }
+
+            Section("Story summaries") {
+                if let settings, let current = settings.summaryModel {
+                    Text(current).font(.callout.monospaced()).foregroundStyle(.secondary)
+                }
+                NavigationLink {
+                    ModelPickerView(title: "Summary Model",
+                                    currentModel: settings?.summaryModel) { picked in
+                        Task { await saveSummaryModel(picked) }
+                    }
+                } label: {
+                    Text(settings?.summaryModel == nil ? "Choose summary model (defaults to the storyteller model)" : "Change summary model")
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Summary prompt").font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $summaryPromptDraft)
+                        .accessibilityLabel("Summary instructions")
+                        .frame(minHeight: 120)
+                        .font(.callout)
+                }
+                Button {
+                    Task { await saveSummaryPrompt() }
+                } label: {
+                    Text(isSavingSummaryPrompt ? "Saving…" : "Save Instructions")
+                }
+                .disabled(isSavingSummaryPrompt || summaryPromptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || summaryPromptDraft == settings?.summaryPrompt)
+                if summaryPromptJustSaved {
+                    Text("Summary prompt saved.").font(.caption).foregroundStyle(.green)
+                }
+            }
+
+        }
+    }
+
+    private var narrationSettings: some View {
+        Group {
             Section("Narration") {
                 if let settings, settings.kokoroBaseUrlIsSet {
                     Text("Server URL is set").foregroundStyle(.secondary)
@@ -104,55 +217,32 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Storyteller") {
-                NavigationLink("Edit storyteller", destination: StorytellerEditorView())
-            }
+        }
+    }
 
-            Section("Story summaries") {
-                if let settings, let current = settings.summaryModel {
-                    Text(current).font(.callout.monospaced()).foregroundStyle(.secondary)
-                }
-                NavigationLink {
-                    ModelPickerView(title: "Summary Model",
-                                    currentModel: settings?.summaryModel) { picked in
-                        Task { await saveSummaryModel(picked) }
-                    }
-                } label: {
-                    Text(settings?.summaryModel == nil ? "Choose summary model (defaults to the storyteller model)" : "Change summary model")
-                }
+    private var connectionSettings: some View {
+        Group {
+            Section("Server") { LabeledContent("URL", value: serverURL) }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Summary prompt").font(.caption).foregroundStyle(.secondary)
-                    TextEditor(text: $summaryPromptDraft)
-                        .frame(minHeight: 120)
-                        .font(.callout)
-                }
+            Section("OpenRouter API key") {
+                if let settings, settings.apiKeyIsSet { Text("Key is set").foregroundStyle(.secondary) }
+                SecureField("sk-or-...", text: $apiKeyDraft)
                 Button {
-                    Task { await saveSummaryPrompt() }
+                    Task { await saveApiKey() }
                 } label: {
-                    Text("Save prompt")
-                }
-                .disabled(summaryPromptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if summaryPromptJustSaved {
-                    Text("Summary prompt saved.").font(.caption).foregroundStyle(.green)
-                }
-            }
-
-            Section("Auto-lock") {
-                if let settings {
-                    Picker("After", selection: Binding(
-                        get: { settings.autoLockSelection },
-                        set: { newValue in Task { await saveAutoLock(newValue) } }
-                    )) {
-                        ForEach(autoLockOptions, id: \.value) { opt in
-                            Text(opt.label).tag(opt.value)
-                        }
+                    HStack {
+                        if isSavingApiKey { ProgressView().controlSize(.mini) }
+                        Text("Save key")
                     }
+                }
+                .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSavingApiKey)
+                if apiKeyJustSaved {
+                    Text("API key saved.").font(.caption).foregroundStyle(.green)
                 }
             }
 
             Section("Vault") {
-                Button(role: .destructive) {
+                Button {
                     Task {
                         isLocking = true
                         await appState.lock()
@@ -164,29 +254,23 @@ struct SettingsView: View {
                 .disabled(isLocking)
             }
 
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.red) }
-            }
         }
-        // Block interaction until settings load so a stray slider drag or prompt
-        // edit can't persist a default over the real server value.
-        .disabled(isLoading)
-        .overlay { if isLoading { ProgressView().controlSize(.large) } }
-        .navigationTitle("Settings")
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { dismiss() }.fixedSize()
-            }
-        }
-        .task { await load() }
     }
 
     private func load() async {
+        isLoading = true
+        errorMessage = nil
         do {
+            #if DEBUG
+            if UIFixtures.enabled { serverURL = "Sample server" }
+            else { serverURL = (try? await KeychainService.shared.loadServerURL()) ?? "" }
+            #else
             serverURL = (try? await KeychainService.shared.loadServerURL()) ?? ""
+            #endif
             settings = try await FabulisAPIClient.shared.settings()
             if let settings { speedDraft = settings.narrationSpeed }
             if let settings { summaryPromptDraft = settings.summaryPrompt }
+            didLoad = true
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -194,6 +278,7 @@ struct SettingsView: View {
     }
 
     private func saveApiKey() async {
+        errorMessage = nil
         let key = apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
         isSavingApiKey = true; defer { isSavingApiKey = false }
@@ -217,11 +302,15 @@ struct SettingsView: View {
     }
 
     private func saveSummaryPrompt() async {
+        errorMessage = nil
+        guard !isSavingSummaryPrompt else { return }
+        isSavingSummaryPrompt = true; defer { isSavingSummaryPrompt = false }
         let trimmed = summaryPromptDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         do {
             try await FabulisAPIClient.shared.updateSettings(summaryPrompt: trimmed)
             settings = try await FabulisAPIClient.shared.settings()
+            summaryPromptDraft = trimmed
             summaryPromptJustSaved = true
             Task { try? await Task.sleep(for: .seconds(3)); summaryPromptJustSaved = false }
         } catch {
@@ -239,6 +328,7 @@ struct SettingsView: View {
     }
 
     private func saveKokoroUrl() async {
+        errorMessage = nil
         let trimmed = kokoroUrlDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         isSavingKokoroUrl = true
@@ -268,6 +358,7 @@ struct SettingsView: View {
             try await FabulisAPIClient.shared.updateSettings(narrationSpeed: speed)
             settings = try await FabulisAPIClient.shared.settings()
         } catch {
+            if let settings { speedDraft = settings.narrationSpeed }
             errorMessage = error.localizedDescription
         }
     }

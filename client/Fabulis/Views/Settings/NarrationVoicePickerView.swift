@@ -21,6 +21,8 @@ struct NarrationVoicePickerView: View {
             } else if let errorMessage {
                 LoadFailedView(title: "Couldn't load voices",
                                message: errorMessage) { Task { await load() } }
+            } else if voices.isEmpty {
+                ContentUnavailableView("No voices available", systemImage: "waveform", description: Text("Check the narration server in Settings."))
             } else {
                 List {
                     ForEach(grouped, id: \.0) { language, items in
@@ -41,6 +43,7 @@ struct NarrationVoicePickerView: View {
                                     }
                                     .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
                                 .accessibilityAddTraits(voice.id == currentVoice ? [.isSelected] : [])
                             }
                         }
@@ -53,6 +56,7 @@ struct NarrationVoicePickerView: View {
     }
 
     private func load() async {
+        errorMessage = nil
         do {
             voices = try await FabulisAPIClient.shared.narrationVoices()
         } catch {

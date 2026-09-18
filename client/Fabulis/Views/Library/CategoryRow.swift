@@ -9,7 +9,7 @@ struct CategoryRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(category.name).font(.body)
             Text(countText)
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
