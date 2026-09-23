@@ -190,6 +190,7 @@ public sealed class VaultExporter
 
                 var text = FrontMatter.Serialize(
                     [
+                        new("origin", version.Origin.ToString()),
                         new("model", version.ModelName),
                         new("created", FrontMatter.FormatTimestamp(version.CreatedAt)),
                     ],

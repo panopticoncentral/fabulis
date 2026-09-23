@@ -66,7 +66,15 @@ public static class LibraryEndpoints
                 category.CreatedAt,
                 category.Stories
                     .OrderBy(s => s.Title)
-                    .Select(s => new StorySummaryDto(s.Id, s.Title, s.CreatedAt, s.Versions.Count))
+                    .Select(s => new StorySummaryDto(
+                        s.Id,
+                        s.Title,
+                        s.CreatedAt,
+                        s.Versions.Count,
+                        s.Versions
+                            .OrderByDescending(v => v.VersionNumber)
+                            .Select(v => (StoryOrigin?)v.Origin)
+                            .FirstOrDefault()))
                     .ToList());
 
             return Results.Ok(dto);

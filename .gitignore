@@ -25,4 +25,3 @@ publish/
 .claude/
 .worktrees/settings.local.json
 .superpowers/
-src/Fabulis.Server/Data/fabulis.db

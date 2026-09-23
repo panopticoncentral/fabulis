@@ -207,6 +207,12 @@ that would itself read as a delimiter — `**Me:**`, `**StoryTeller:**`, or
 so a message that quotes the format round-trips intact instead of silently
 corrupting.
 
+Story-version front matter includes `origin: Generated` or
+`origin: Imported`. Generated versions normally include `model`; imported
+versions may omit it. An imported prose story can be represented by a single
+`**StoryTeller:**` response block, which keeps it on the same reader, search,
+narration, and summary paths as generated stories.
+
 ## Known lossy round trips
 
 - Row ids change; identity is the path.
@@ -232,10 +238,10 @@ genuinely isn't there.
 ## Database location
 
 The `export` and `import` verbs open the vault; the `sillytavern` verb does
-not. By default the CLI walks up from its own assembly directory until it
-finds `Fabulis.slnx`, then opens
-`src/Fabulis.Server/bin/Debug/net10.0/data/fabulis.db`. To point at a
-different file (release build, deployed location, alternate vault), set:
+not. The CLI resolves the database exactly the way the server does, so the
+two always agree: `fabulis.db` in the `Fabulis` directory under your
+application-data directory (`~/Library/Application Support/Fabulis` on macOS).
+To point at a different file (deployed location, alternate vault), set:
 
 ```
 export FABULIS_DB_PATH=/path/to/fabulis.db

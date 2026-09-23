@@ -40,6 +40,7 @@ struct StorySummary: Decodable, Identifiable, Sendable {
     let title: String
     let createdAt: Date
     let versionCount: Int
+    let origin: StoryOrigin?
 }
 
 struct StoryDetail: Decodable, Identifiable, Sendable {
@@ -54,7 +55,8 @@ struct StoryDetail: Decodable, Identifiable, Sendable {
 struct StoryVersionSummary: Decodable, Identifiable, Sendable {
     let id: Int
     let versionNumber: Int
-    let modelName: String
+    let origin: StoryOrigin
+    let modelName: String?
     let createdAt: Date
 }
 
@@ -62,7 +64,8 @@ struct StoryVersionDetail: Decodable, Identifiable, Sendable {
     let id: Int
     let storyId: Int
     let versionNumber: Int
-    let modelName: String
+    let origin: StoryOrigin
+    let modelName: String?
     let createdAt: Date
     let messages: [StoryMessage]
 }
@@ -80,6 +83,11 @@ struct StorySummaryDetail: Decodable, Sendable {
 enum MessageRole: String, Decodable, Sendable {
     case prompt = "Prompt"
     case response = "Response"
+}
+
+enum StoryOrigin: String, Decodable, Sendable {
+    case generated = "Generated"
+    case imported = "Imported"
 }
 
 struct StoryMessage: Decodable, Identifiable, Sendable {

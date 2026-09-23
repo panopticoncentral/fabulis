@@ -377,10 +377,12 @@ public sealed class VaultImporter
                     continue;
                 }
 
+                var origin = ParseStoryOrigin(Scalar(fields, "origin"), file.FullName);
                 var version = new StoryVersion
                 {
                     VersionNumber = versionNumber,
-                    ModelName = Scalar(fields, "model") ?? "(unknown)",
+                    Origin = origin,
+                    ModelName = StoryModelName(fields, origin),
                     CreatedAt = created,
                     Story = story,
                 };
@@ -403,7 +405,8 @@ public sealed class VaultImporter
 
     private static void UpdateVersion(StoryVersion version, Dictionary<string, string> fields, string body)
     {
-        version.ModelName = Scalar(fields, "model") ?? version.ModelName;
+        version.Origin = ParseStoryOrigin(Scalar(fields, "origin"));
+        version.ModelName = StoryModelName(fields, version.Origin);
         version.CreatedAt = FrontMatter.ParseTimestamp(Scalar(fields, "created")) ?? version.CreatedAt;
         version.Messages.Clear();
         version.Messages.AddRange(ConversationFormat.Read(body).Select(t => new StoryMessage
@@ -411,6 +414,24 @@ public sealed class VaultImporter
             Role = t.Role, Content = t.Content, SortOrder = t.SortOrder,
         }));
     }
+
+    private static StoryOrigin ParseStoryOrigin(string? raw, string? path = null)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return StoryOrigin.Generated; // archives written before provenance was added
+
+        if (Enum.TryParse<StoryOrigin>(raw, ignoreCase: true, out var origin))
+            return origin;
+
+        Console.Error.WriteLine(
+            $"warn: unrecognized story origin '{raw}', using Generated" +
+            (path is null ? "" : $": {path}"));
+        return StoryOrigin.Generated;
+    }
+
+    private static string? StoryModelName(
+        Dictionary<string, string> fields, StoryOrigin origin) =>
+        Scalar(fields, "model") ?? (origin == StoryOrigin.Generated ? "(unknown)" : null);
 
     private static async Task ImportPromptsAsync(
         DirectoryInfo categoryDir, Category category, ImportResult result,

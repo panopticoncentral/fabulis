@@ -28,7 +28,8 @@ public static class StoryEndpoints
                 story.CreatedAt,
                 story.Versions
                     .OrderByDescending(v => v.VersionNumber)
-                    .Select(v => new StoryVersionSummaryDto(v.Id, v.VersionNumber, v.ModelName, v.CreatedAt))
+                    .Select(v => new StoryVersionSummaryDto(
+                        v.Id, v.VersionNumber, v.Origin, v.ModelName, v.CreatedAt))
                     .ToList());
 
             return Results.Ok(dto);
@@ -50,6 +51,7 @@ public static class StoryEndpoints
                 v.Id,
                 v.StoryId,
                 v.VersionNumber,
+                v.Origin,
                 v.ModelName,
                 v.CreatedAt,
                 v.Messages

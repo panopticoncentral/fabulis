@@ -166,8 +166,10 @@ struct StoryView: View {
     }
 
     private var versionSource: String? {
-        guard let versionDetail, !versionDetail.modelName.isEmpty else { return nil }
-        return "Model: \(versionDetail.modelName)"
+        guard let versionDetail else { return nil }
+        return versionDetail.origin == .imported
+            ? "Imported"
+            : versionDetail.modelName.flatMap { $0.isEmpty ? nil : "Model: \($0)" }
     }
 
     /// The current version's prose (response messages), for ShareLink/export.

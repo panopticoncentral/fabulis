@@ -61,6 +61,7 @@ internal static class VaultSnapshot
                 foreach (var version in story.Versions.OrderBy(v => v.VersionNumber))
                 {
                     sb.AppendLine($"    version={version.VersionNumber}");
+                    sb.AppendLine($"      origin={version.Origin}");
                     sb.AppendLine($"      model={version.ModelName}");
                     sb.AppendLine($"      created={Stamp(version.CreatedAt)}");
                     foreach (var m in version.Messages.OrderBy(m => m.SortOrder))

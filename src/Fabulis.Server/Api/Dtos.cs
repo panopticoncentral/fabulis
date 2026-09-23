@@ -33,7 +33,8 @@ public sealed record StorySummaryDto(
     int Id,
     string Title,
     DateTime CreatedAt,
-    int VersionCount);
+    int VersionCount,
+    StoryOrigin? Origin);
 
 public sealed record StoryDto(
     int Id,
@@ -46,14 +47,16 @@ public sealed record StoryDto(
 public sealed record StoryVersionSummaryDto(
     int Id,
     int VersionNumber,
-    string ModelName,
+    StoryOrigin Origin,
+    string? ModelName,
     DateTime CreatedAt);
 
 public sealed record StoryVersionDto(
     int Id,
     int StoryId,
     int VersionNumber,
-    string ModelName,
+    StoryOrigin Origin,
+    string? ModelName,
     DateTime CreatedAt,
     IReadOnlyList<StoryMessageDto> Messages);
 

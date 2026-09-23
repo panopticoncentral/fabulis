@@ -216,36 +216,19 @@ static void PrintUsage()
     Console.Error.WriteLine();
     Console.Error.WriteLine("Database location (export/import only):");
     Console.Error.WriteLine("  Set FABULIS_DB_PATH to point at the SQLCipher .db file. If unset,");
-    Console.Error.WriteLine("  the CLI walks up from its own directory looking for Fabulis.slnx");
-    Console.Error.WriteLine("  and uses src/Fabulis.Server/bin/Debug/net10.0/data/fabulis.db.");
+    Console.Error.WriteLine("  the CLI uses the same default as the server: the fabulis.db in the");
+    Console.Error.WriteLine("  Fabulis directory under your application-data directory.");
 }
 
 static string ResolveDatabasePath()
 {
-    var fromEnv = Environment.GetEnvironmentVariable("FABULIS_DB_PATH");
-    if (!string.IsNullOrEmpty(fromEnv))
-    {
-        if (!File.Exists(fromEnv))
-            throw new FileNotFoundException($"FABULIS_DB_PATH points at a non-existent file: {fromEnv}");
-        return fromEnv;
-    }
+    var path = VaultLocation.DatabasePath;
 
-    var dir = new DirectoryInfo(AppContext.BaseDirectory);
-    while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Fabulis.slnx")))
-        dir = dir.Parent;
-
-    if (dir is null)
+    if (!File.Exists(path))
         throw new FileNotFoundException(
-            "Could not locate Fabulis.slnx by walking up from the CLI directory. " +
-            "Set FABULIS_DB_PATH to point at the database file.");
+            $"No vault database at {path}. Start the server at least once to create " +
+            $"one, or set {VaultLocation.PathEnvironmentVariable} to point at an " +
+            "existing database file.");
 
-    var candidate = Path.Combine(
-        dir.FullName, "src", "Fabulis.Server", "bin", "Debug", "net10.0", "data", "fabulis.db");
-
-    if (!File.Exists(candidate))
-        throw new FileNotFoundException(
-            $"Database not found at the default location: {candidate}. " +
-            "Build and run the server at least once, or set FABULIS_DB_PATH.");
-
-    return candidate;
+    return path;
 }

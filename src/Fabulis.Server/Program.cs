@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var databasePath = VaultLocation.DatabasePath;
+Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+
 builder.Services.AddSingleton<Fabulis.Server.Auth.SessionTokenStore>();
 builder.Services.AddSingleton<VaultService>();
 builder.Services.AddHostedService<AutoLockService>();
@@ -12,11 +15,8 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
     var vault = sp.GetRequiredService<VaultService>();
     if (vault.IsUnlocked)
     {
-        var dataDir = Path.Combine(AppContext.BaseDirectory, "data");
-        Directory.CreateDirectory(dataDir);
-        var dbPath = Path.Combine(dataDir, "fabulis.db");
         options.UseSqlite(
-            $"Data Source={dbPath};Password={vault.Password}",
+            $"Data Source={databasePath};Password={vault.Password}",
             sqlite => sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
     }
 });
@@ -38,6 +38,13 @@ builder.Services.AddSingleton<SummaryService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SummaryService>());
 
 var app = builder.Build();
+
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Fabulis.Startup");
+if (VaultLocation.MigrateLegacyDatabase(VaultLocation.LegacyDatabasePath, databasePath))
+    startupLog.LogInformation(
+        "Moved the vault out of the build output to {DatabasePath}.", databasePath);
+else
+    startupLog.LogInformation("Vault database: {DatabasePath}", databasePath);
 
 app.Use(async (context, next) =>
 {

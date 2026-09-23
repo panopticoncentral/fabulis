@@ -67,6 +67,10 @@ public class FabulisDbContext : DbContext
             .Property(s => s.SummaryStatus)
             .HasConversion<string>();
 
+        modelBuilder.Entity<StoryVersion>()
+            .Property(v => v.Origin)
+            .HasConversion<string>();
+
         modelBuilder.Entity<Storyteller>()
             .Property(s => s.ReasoningEffort)
             .HasConversion<string>();
@@ -143,6 +147,81 @@ public class FabulisDbContext : DbContext
             await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummarizedThroughVersion INTEGER NULL");
             await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummaryError TEXT NULL");
             await Database.ExecuteSqlRawAsync("ALTER TABLE Stories ADD COLUMN SummaryUpdatedAt TEXT NULL");
+        }
+
+        // Story versions originally assumed that every saved story came from
+        // an LLM, so ModelName was required and there was no provenance field.
+        // Imported prose needs an explicit origin and no pretend model name.
+        // Rebuild the parent table on legacy vaults because SQLite cannot
+        // remove a NOT NULL constraint with ALTER COLUMN.
+        var storyVersionColumns = await Database
+            .SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('StoryVersions')")
+            .ToListAsync();
+        var modelNameNotNull = await Database
+            .SqlQueryRaw<long>(
+                "SELECT [notnull] AS Value FROM pragma_table_info('StoryVersions') WHERE name = 'ModelName'")
+            .SingleAsync();
+
+        if (modelNameNotNull != 0)
+        {
+            await Database.OpenConnectionAsync();
+            try
+            {
+                await Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF");
+                await using var transaction = await Database.BeginTransactionAsync();
+                try
+                {
+                    await Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS StoryVersions_rebuild");
+                    await Database.ExecuteSqlRawAsync("""
+                        CREATE TABLE StoryVersions_rebuild (
+                            Id INTEGER NOT NULL CONSTRAINT PK_StoryVersions PRIMARY KEY AUTOINCREMENT,
+                            StoryId INTEGER NOT NULL,
+                            VersionNumber INTEGER NOT NULL,
+                            Origin TEXT NOT NULL DEFAULT 'Generated',
+                            ModelName TEXT NULL,
+                            CreatedAt TEXT NOT NULL,
+                            CONSTRAINT FK_StoryVersions_Stories_StoryId
+                                FOREIGN KEY (StoryId) REFERENCES Stories (Id) ON DELETE CASCADE
+                        )
+                        """);
+
+                    var originExpression = storyVersionColumns.Contains("Origin")
+                        ? "Origin"
+                        : "'Generated'";
+#pragma warning disable EF1002
+                    await Database.ExecuteSqlRawAsync($"""
+                        INSERT INTO StoryVersions_rebuild
+                            (Id, StoryId, VersionNumber, Origin, ModelName, CreatedAt)
+                        SELECT Id, StoryId, VersionNumber, {originExpression}, ModelName, CreatedAt
+                        FROM StoryVersions
+                        """);
+#pragma warning restore EF1002
+                    await Database.ExecuteSqlRawAsync("DROP TABLE StoryVersions");
+                    await Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE StoryVersions_rebuild RENAME TO StoryVersions");
+                    await Database.ExecuteSqlRawAsync(
+                        "CREATE INDEX IX_StoryVersions_StoryId ON StoryVersions (StoryId)");
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+                finally
+                {
+                    await Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = ON");
+                }
+            }
+            finally
+            {
+                await Database.CloseConnectionAsync();
+            }
+        }
+        else if (!storyVersionColumns.Contains("Origin"))
+        {
+            await Database.ExecuteSqlRawAsync(
+                "ALTER TABLE StoryVersions ADD COLUMN Origin TEXT NOT NULL DEFAULT 'Generated'");
         }
 
         await Database.ExecuteSqlRawAsync("""

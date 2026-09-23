@@ -84,9 +84,29 @@ public class VaultExporterTests : IDisposable
             ArchiveLayout.StoriesDir, "The Fox", "Version 1.md");
         var (fields, body) = FrontMatter.Parse(await File.ReadAllTextAsync(path));
 
+        Assert.Equal("Generated", fields["origin"]);
         Assert.Equal("anthropic/claude-sonnet-4", fields["model"]);
         Assert.Equal(VaultFixture.Epoch, FrontMatter.ParseTimestamp(fields["created"]));
         Assert.Equal(2, ConversationFormat.Read(body).Count);
+    }
+
+    [Fact]
+    public async Task WritesImportedStoryWithoutPretendModelName()
+    {
+        await _fixture.SeedFullVaultAsync();
+        var version = await _fixture.Db.StoryVersions.SingleAsync();
+        version.Origin = StoryOrigin.Imported;
+        version.ModelName = null;
+        await _fixture.Db.SaveChangesAsync();
+
+        var dest = _fixture.TempDir();
+        await new VaultExporter().ExportAsync(_fixture.Db, dest);
+        var path = Path.Combine(dest, ArchiveLayout.LibraryDir, "Fables",
+            ArchiveLayout.StoriesDir, "The Fox", "Version 1.md");
+        var (fields, _) = FrontMatter.Parse(await File.ReadAllTextAsync(path));
+
+        Assert.Equal("Imported", fields["origin"]);
+        Assert.False(fields.ContainsKey("model"));
     }
 
     [Fact]

@@ -104,7 +104,14 @@ struct CategoryView: View {
 
     private func storyRow(_ story: StorySummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(story.title).font(.body)
+            HStack {
+                Text(story.title).font(.body)
+                if story.origin == .imported {
+                    Label("Imported", systemImage: "square.and.arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Text(story.createdAt.formatted(date: .abbreviated, time: .omitted))
                 .font(.caption).foregroundStyle(.secondary)
         }

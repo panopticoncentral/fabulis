@@ -111,6 +111,24 @@ public class VaultImporterTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportsExternalStoryProvenanceWithoutAModel()
+    {
+        var archive = await ArchiveAsync();
+        var path = Path.Combine(archive, ArchiveLayout.LibraryDir, "Fables",
+            ArchiveLayout.StoriesDir, "The Fox", "Version 1.md");
+        var text = await File.ReadAllTextAsync(path);
+        text = text.Replace("origin: Generated\n", "origin: Imported\n")
+            .Replace("model: anthropic/claude-sonnet-4\n", "");
+        await File.WriteAllTextAsync(path, text);
+
+        await new VaultImporter().ImportAsync(_target.Db, archive);
+
+        var version = await _target.Db.StoryVersions.SingleAsync();
+        Assert.Equal(StoryOrigin.Imported, version.Origin);
+        Assert.Null(version.ModelName);
+    }
+
+    [Fact]
     public async Task DerivesStoryAndCategoryTimestampsFromChildren()
     {
         var archive = await ArchiveAsync();
