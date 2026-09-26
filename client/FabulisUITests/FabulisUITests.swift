@@ -123,7 +123,10 @@ final class FabulisUITests: XCTestCase {
         let app = launch()
         XCTAssertTrue(app.staticTexts["Lantern draft"].firstMatch.waitForExistence(timeout: 10))
         app.staticTexts["Lantern draft"].firstMatch.activateElement()
-        app.buttons["Save to Library…"].activateElement()
+        let saveButton = app.buttons["Save to Library…"].firstMatch
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(saveButton.isEnabled, "A loaded draft with messages should enable Save to Library")
+        saveButton.activateElement()
         XCTAssertTrue(app.buttons["Create Story"].waitForExistence(timeout: 5))
         capture("Save to library", app: app)
         app.buttons["Create Story"].activateElement()

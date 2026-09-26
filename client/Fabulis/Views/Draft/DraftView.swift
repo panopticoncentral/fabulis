@@ -45,6 +45,9 @@ struct DraftView: View {
     private var playingBubbleId: Int? {
         appState.narrationSource == narrationSource ? player.currentBubbleId : nil
     }
+    private var canSaveToLibrary: Bool {
+        !(draft?.messages.isEmpty ?? true) && !isStreaming && editingMessage == nil
+    }
     /// Starts unset. `loadDraft` flips it to the .bottom edge once messages
     /// arrive — initializing with .bottom directly is a no-op (the ScrollView
     /// applies it against empty content, then sees no binding change when the
@@ -141,7 +144,7 @@ struct DraftView: View {
         .navigationBarTitleDisplayMode(.inline)
         .focusedSceneValue(\.contentActions, ContentActions(
             saveChanges: editingMessage != nil && canSaveEdit ? { Task { await saveEdit() } } : nil,
-            saveToLibrary: !(draft?.messages.isEmpty ?? true) && !isStreaming && editingMessage == nil ? { showSaveSheet = true } : nil))
+            saveToLibrary: canSaveToLibrary ? { showSaveSheet = true } : nil))
         .alert("Delete message?",
                isPresented: Binding(
                     get: { messagePendingDeletion != nil },
@@ -177,10 +180,14 @@ struct DraftView: View {
                         .disabled(isStreaming || editingMessage != nil)
                 }
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Save to Library…", systemImage: "square.and.arrow.down") { showSaveSheet = true }
-                    .disabled((draft?.messages.isEmpty ?? true) || isStreaming || editingMessage != nil)
-                    .help("Save a story or a new version to the library")
+            // Insert the Mac Catalyst toolbar item after loading so it starts
+            // with the fetched draft state, rather than the initial disabled state.
+            if draft != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save to Library…", systemImage: "square.and.arrow.down") { showSaveSheet = true }
+                        .disabled(!canSaveToLibrary)
+                        .help("Save a story or a new version to the library")
+                }
             }
         }
         .sheet(isPresented: $showSaveSheet) {
