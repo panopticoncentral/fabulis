@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Data;
 
@@ -41,7 +40,7 @@ public class KokoroService
     public KokoroService(
         IHttpClientFactory httpClientFactory,
         IServiceProvider services)
-        : this(httpClientFactory, ct => GetBaseUrlFromDbAsync(services, ct)) { }
+        : this(httpClientFactory, ct => GetBaseUrlFromStoreAsync(services, ct)) { }
 
     /// <summary>Testing ctor. Injects the URL lookup directly.</summary>
     public KokoroService(
@@ -52,13 +51,12 @@ public class KokoroService
         _baseUrlLookup = baseUrlLookup;
     }
 
-    private static async Task<string?> GetBaseUrlFromDbAsync(
+    private static async Task<string?> GetBaseUrlFromStoreAsync(
         IServiceProvider services, CancellationToken ct)
     {
         using var scope = services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
-        var setting = await db.AppSettings.FindAsync(["KokoroBaseUrl"], ct);
-        var value = setting?.Value;
+        var store = scope.ServiceProvider.GetRequiredService<IVaultStore>();
+        var value = await store.GetSettingAsync("KokoroBaseUrl", ct);
         return string.IsNullOrWhiteSpace(value) ? null : value.TrimEnd('/');
     }
 

@@ -1,7 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
-using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Data;
 
@@ -256,9 +255,8 @@ public class OpenRouterService(IHttpClientFactory httpClientFactory, IServicePro
     public async Task<string?> GetSettingAsync(string key)
     {
         await using var scope = services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
-        var setting = await db.AppSettings.FindAsync(key);
-        return setting?.Value;
+        var store = scope.ServiceProvider.GetRequiredService<IVaultStore>();
+        return await store.GetSettingAsync(key);
     }
 }
 

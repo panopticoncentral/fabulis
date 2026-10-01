@@ -37,8 +37,8 @@ public static class AuthEndpoints
                 await db.Database.EnsureCreatedAsync();
                 await db.EnsureSchemaUpdatedAsync();
 
-                var setting = await db.AppSettings.FindAsync("AutoLockMinutes");
-                vault.ConfigureAutoLock(ParseAutoLockMinutes(setting?.Value));
+                var store = scope.ServiceProvider.GetRequiredService<IVaultStore>();
+                vault.ConfigureAutoLock(ParseAutoLockMinutes(await store.GetSettingAsync("AutoLockMinutes")));
             }
             catch
             {

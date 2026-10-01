@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Fabulis.Server.Auth;
 using Fabulis.Server.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Api;
 
@@ -39,7 +38,7 @@ public static class NarrationEndpoints
         // /play/{token} GET below.
         authed.MapPost("prepare", async (
             SynthesizeRequest body,
-            FabulisDbContext db,
+            IVaultStore store,
             NarrationTokenStore tokens,
             ILoggerFactory loggerFactory) =>
         {
@@ -53,14 +52,13 @@ public static class NarrationEndpoints
             if (string.IsNullOrWhiteSpace(stripped))
                 return Results.BadRequest(new { error = "text has no readable content after markdown stripping" });
 
-            var voiceSetting = await db.AppSettings.FindAsync(["NarrationVoice"]);
-            var speedSetting = await db.AppSettings.FindAsync(["NarrationSpeed"]);
+            var settings = await store.GetSettingsAsync();
 
-            var voice = NarrationValidation.NormalizeVoice(body.Voice, voiceSetting?.Value);
+            var voice = NarrationValidation.NormalizeVoice(body.Voice, settings.GetValueOrDefault("NarrationVoice"));
             if (voice is null)
                 return Results.BadRequest(new { error = "no voice configured" });
 
-            var speed = NarrationValidation.NormalizeSpeed(body.Speed, speedSetting?.Value);
+            var speed = NarrationValidation.NormalizeSpeed(body.Speed, settings.GetValueOrDefault("NarrationSpeed"));
             if (!NarrationValidation.IsSpeedValid(speed))
                 return Results.BadRequest(new { error = $"speed must be between {NarrationValidation.MinSpeed} and {NarrationValidation.MaxSpeed}" });
 

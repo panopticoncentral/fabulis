@@ -1,6 +1,5 @@
 using Fabulis.Server.Auth;
 using Fabulis.Server.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace Fabulis.Server.Api;
 
@@ -13,48 +12,50 @@ public static class SettingsEndpoints
     {
         var group = routes.MapGroup("/settings").RequireSession();
 
-        group.MapGet("", async (FabulisDbContext db, KokoroService kokoro, CancellationToken ct) =>
+        group.MapGet("", async (IVaultStore store, KokoroService kokoro, CancellationToken ct) =>
         {
-            var apiKey = await db.AppSettings.FindAsync(["OpenRouterApiKey"], ct);
-            var autoLock = await db.AppSettings.FindAsync(["AutoLockMinutes"], ct);
-            var kokoroUrl = await db.AppSettings.FindAsync(["KokoroBaseUrl"], ct);
-            var narrationVoice = await db.AppSettings.FindAsync(["NarrationVoice"], ct);
-            var narrationSpeed = await db.AppSettings.FindAsync(["NarrationSpeed"], ct);
-            var summaryModel = await db.AppSettings.FindAsync(["SummaryModel"], ct);
-            var summaryPrompt = await db.AppSettings.FindAsync(["SummaryPrompt"], ct);
+            var settings = await store.GetSettingsAsync(ct);
+            var apiKey = settings.GetValueOrDefault("OpenRouterApiKey");
+            var autoLock = settings.GetValueOrDefault("AutoLockMinutes");
+            var kokoroUrl = settings.GetValueOrDefault("KokoroBaseUrl");
+            var narrationVoice = settings.GetValueOrDefault("NarrationVoice");
+            var narrationSpeed = settings.GetValueOrDefault("NarrationSpeed");
+            var summaryModel = settings.GetValueOrDefault("SummaryModel");
+            var summaryPrompt = settings.GetValueOrDefault("SummaryPrompt");
 
             var dto = new SettingsDto(
-                ApiKeyIsSet: apiKey is not null && !string.IsNullOrEmpty(apiKey.Value),
-                AutoLockSelection: NormalizeAutoLock(autoLock?.Value),
-                KokoroBaseUrlIsSet: kokoroUrl is not null && !string.IsNullOrWhiteSpace(kokoroUrl.Value),
-                NarrationVoice: narrationVoice?.Value,
-                NarrationSpeed: NarrationValidation.NormalizeSpeed(null, narrationSpeed?.Value),
+                ApiKeyIsSet: !string.IsNullOrEmpty(apiKey),
+                AutoLockSelection: NormalizeAutoLock(autoLock),
+                KokoroBaseUrlIsSet: !string.IsNullOrWhiteSpace(kokoroUrl),
+                NarrationVoice: narrationVoice,
+                NarrationSpeed: NarrationValidation.NormalizeSpeed(null, narrationSpeed),
                 NarrationAvailable: await kokoro.ProbeAsync(ct)
-                    && !string.IsNullOrWhiteSpace(narrationVoice?.Value),
-                SummaryModel: summaryModel?.Value,
-                SummaryPrompt: string.IsNullOrWhiteSpace(summaryPrompt?.Value)
+                    && !string.IsNullOrWhiteSpace(narrationVoice),
+                SummaryModel: summaryModel,
+                SummaryPrompt: string.IsNullOrWhiteSpace(summaryPrompt)
                     ? StorySummary.DefaultPrompt
-                    : summaryPrompt!.Value);
+                    : summaryPrompt);
 
             return Results.Ok(dto);
         });
 
         group.MapPut("", async (
             SettingsUpdateRequest body,
-            FabulisDbContext db,
+            IVaultStore store,
             VaultService vault,
-            KokoroService kokoro) =>
+            KokoroService kokoro,
+            CancellationToken ct) =>
         {
+            var changes = new Dictionary<string, string>(StringComparer.Ordinal);
             if (body.ApiKey is { } apiKey && !string.IsNullOrWhiteSpace(apiKey))
-                await UpsertAsync(db, "OpenRouterApiKey", apiKey.Trim());
+                changes["OpenRouterApiKey"] = apiKey.Trim();
 
             if (body.AutoLockSelection is { } autoLock)
             {
                 if (!LegalAutoLock.Contains(autoLock))
                     return Results.BadRequest(new { error = "autoLockSelection must be one of 1, 5, 15, 30, 60, or never" });
 
-                await UpsertAsync(db, "AutoLockMinutes", autoLock);
-                vault.ConfigureAutoLock(autoLock.Equals("never", StringComparison.OrdinalIgnoreCase) ? null : int.Parse(autoLock));
+                changes["AutoLockMinutes"] = autoLock;
             }
 
             if (body.KokoroBaseUrl is { } urlInput)
@@ -62,47 +63,41 @@ public static class SettingsEndpoints
                 var trimmed = urlInput.Trim();
                 if (trimmed.Length == 0)
                 {
-                    await UpsertAsync(db, "KokoroBaseUrl", "");
+                    changes["KokoroBaseUrl"] = "";
                 }
                 else
                 {
                     if (!NarrationValidation.IsBaseUrlValid(trimmed))
                         return Results.BadRequest(new { error = "kokoroBaseUrl must be a valid http(s) URL" });
-                    await UpsertAsync(db, "KokoroBaseUrl", NarrationValidation.NormalizeBaseUrl(trimmed));
+                    changes["KokoroBaseUrl"] = NarrationValidation.NormalizeBaseUrl(trimmed);
                 }
-                kokoro.InvalidateCaches();
             }
 
             if (body.NarrationVoice is { } voice && !string.IsNullOrWhiteSpace(voice))
-                await UpsertAsync(db, "NarrationVoice", voice.Trim());
+                changes["NarrationVoice"] = voice.Trim();
 
             if (body.NarrationSpeed is { } speed)
             {
                 if (!NarrationValidation.IsSpeedValid(speed))
                     return Results.BadRequest(new { error = $"narrationSpeed must be between {NarrationValidation.MinSpeed} and {NarrationValidation.MaxSpeed}" });
-                await UpsertAsync(db, "NarrationSpeed", speed.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture));
+                changes["NarrationSpeed"] = speed.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             }
 
             if (body.SummaryModel is { } summaryModel && !string.IsNullOrWhiteSpace(summaryModel))
-                await UpsertAsync(db, "SummaryModel", summaryModel.Trim());
+                changes["SummaryModel"] = summaryModel.Trim();
 
             if (body.SummaryPrompt is { } summaryPrompt && !string.IsNullOrWhiteSpace(summaryPrompt))
-                await UpsertAsync(db, "SummaryPrompt", summaryPrompt.Trim());
+                changes["SummaryPrompt"] = summaryPrompt.Trim();
 
-            await db.SaveChangesAsync();
+            await store.UpdateSettingsAsync(changes, ct);
+            // Apply runtime effects only after the whole validated update commits.
+            if (changes.TryGetValue("AutoLockMinutes", out var savedAutoLock))
+                vault.ConfigureAutoLock(savedAutoLock.Equals("never", StringComparison.OrdinalIgnoreCase) ? null : int.Parse(savedAutoLock));
+            if (changes.ContainsKey("KokoroBaseUrl")) kokoro.InvalidateCaches();
             return Results.NoContent();
         });
 
         return routes;
-    }
-
-    private static async Task UpsertAsync(FabulisDbContext db, string key, string value)
-    {
-        var existing = await db.AppSettings.FindAsync(key);
-        if (existing is not null)
-            existing.Value = value;
-        else
-            db.AppSettings.Add(new AppSetting { Key = key, Value = value });
     }
 
     private static string NormalizeAutoLock(string? raw)

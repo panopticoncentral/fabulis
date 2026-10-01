@@ -104,7 +104,8 @@ public sealed class SummaryService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<FabulisDbContext>();
         var openRouter = scope.ServiceProvider.GetRequiredService<OpenRouterService>();
 
-        var (model, prompt) = await ResolveModelAndPromptAsync(db);
+        var store = scope.ServiceProvider.GetRequiredService<IVaultStore>();
+        var (model, prompt) = await ResolveModelAndPromptAsync(db, store, ct);
         if (string.IsNullOrWhiteSpace(model))
             return; // No model configured; nothing we can do until settings change.
 
@@ -242,20 +243,22 @@ public sealed class SummaryService : BackgroundService
         }
     }
 
-    private static async Task<(string? model, string prompt)> ResolveModelAndPromptAsync(FabulisDbContext db)
+    private static async Task<(string? model, string prompt)> ResolveModelAndPromptAsync(
+        FabulisDbContext db, IVaultStore store, CancellationToken ct)
     {
         // No explicit summary model falls back to the storyteller's model —
         // the one the user actually picked for generation.
-        var summaryModel = await db.AppSettings.FindAsync("SummaryModel");
-        var model = !string.IsNullOrWhiteSpace(summaryModel?.Value)
-            ? summaryModel!.Value
+        var settings = await store.GetSettingsAsync(ct);
+        var summaryModel = settings.GetValueOrDefault("SummaryModel");
+        var model = !string.IsNullOrWhiteSpace(summaryModel)
+            ? summaryModel
             : await db.Storytellers.OrderBy(s => s.Id)
-                .Select(s => s.ModelName).FirstOrDefaultAsync();
+                .Select(s => s.ModelName).FirstOrDefaultAsync(ct);
 
-        var promptSetting = await db.AppSettings.FindAsync("SummaryPrompt");
-        var prompt = string.IsNullOrWhiteSpace(promptSetting?.Value)
+        var promptSetting = settings.GetValueOrDefault("SummaryPrompt");
+        var prompt = string.IsNullOrWhiteSpace(promptSetting)
             ? StorySummary.DefaultPrompt
-            : promptSetting!.Value;
+            : promptSetting;
 
         return (model, prompt);
     }

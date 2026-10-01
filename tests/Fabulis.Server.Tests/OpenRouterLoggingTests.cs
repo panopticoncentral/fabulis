@@ -31,6 +31,7 @@ public class OpenRouterLoggingTests : IDisposable
 
         var collection = new ServiceCollection();
         collection.AddDbContext<FabulisDbContext>(o => o.UseSqlite(_connection));
+        collection.AddScoped<IVaultStore, SqliteVaultStore>();
         _services = collection.BuildServiceProvider();
 
         using (var scope = _services.CreateScope())

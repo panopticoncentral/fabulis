@@ -21,6 +21,7 @@ builder.Services.AddDbContext<FabulisDbContext>((sp, options) =>
     }
 });
 
+builder.Services.AddScoped<IVaultStore, SqliteVaultStore>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("kokoro", client =>
 {

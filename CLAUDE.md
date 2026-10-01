@@ -65,6 +65,12 @@ dotnet run --project src/Fabulis.Cli -- import <source> [--mirror] [--yes]
 
 `docs/superpowers/specs/2026-05-02-hybrid-architecture-design.md`
 
+Current storage migration: retain the server and Swift client; replace the
+server's database with directory storage. `docs/directory-storage-progress.md`
+records implementation status. The direct Mac client proposal dated 2026-09-23
+is obsolete and must not override this direction. `IVaultStore` currently covers
+settings, backed by SQLite while the remaining storage operations are extracted.
+
 ## Deferred work
 
 `BACKLOG.md` at the repo root — single source of truth for items
