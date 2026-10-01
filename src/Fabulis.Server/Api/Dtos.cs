@@ -261,3 +261,9 @@ public sealed record CreateCategoryRequest(string Name);
 public sealed record RenameCategoryRequest(string Name);
 public sealed record ModelInfoDto(string Id, string Name);
 public sealed record UpdateMessageRequest(string Content);
+
+// ---------- global search ----------
+public sealed record SearchResultDto(
+    string Kind, int EntityId, int ItemId, string Title,
+    int? CategoryId, string? CategoryName, int? VersionNumber, string Snippet, bool MatchInSummary);
+public sealed record SearchResponse(IReadOnlyList<SearchResultDto> Results, bool HasMore);

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StorytellerEditorView: View {
+    var storytellerId: Int? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var existing: StorytellerDto?
     @State private var name: String = ""
@@ -136,7 +137,7 @@ struct StorytellerEditorView: View {
 
     private func load() async {
         do {
-            let s = try await FabulisAPIClient.shared.getStoryteller()
+            let s = try await FabulisAPIClient.shared.getStoryteller(id: storytellerId)
             existing = s
             name = s.name
             prompt = s.prompt
@@ -172,7 +173,7 @@ struct StorytellerEditorView: View {
                 minP: Double(minP.trimmingCharacters(in: .whitespacesAndNewlines)),
                 topK: Int(topK.trimmingCharacters(in: .whitespacesAndNewlines)),
                 topA: Double(topA.trimmingCharacters(in: .whitespacesAndNewlines)),
-                reasoningEffort: reasoningEffort))
+                reasoningEffort: reasoningEffort), id: storytellerId)
             savedAt = Date()
             originalSignature = currentSignature
         } catch {

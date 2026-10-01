@@ -10,9 +10,9 @@ public static class StorytellerEndpoints
     {
         var group = routes.MapGroup("/storyteller").RequireSession();
 
-        group.MapGet("", async (FabulisDbContext db) =>
+        group.MapGet("", async (int? id, FabulisDbContext db) =>
         {
-            var s = await db.Storytellers.OrderBy(x => x.Id).FirstOrDefaultAsync();
+            var s = await db.Storytellers.Where(x => id == null || x.Id == id).OrderBy(x => x.Id).FirstOrDefaultAsync();
             if (s is null)
                 return Results.NotFound();
 
@@ -22,7 +22,7 @@ public static class StorytellerEndpoints
                 s.ReasoningEffort));
         });
 
-        group.MapPut("", async (StorytellerUpdateRequest body, FabulisDbContext db) =>
+        group.MapPut("", async (int? id, StorytellerUpdateRequest body, FabulisDbContext db) =>
         {
             if (string.IsNullOrWhiteSpace(body.Name) ||
                 string.IsNullOrWhiteSpace(body.Prompt) ||
@@ -36,7 +36,7 @@ public static class StorytellerEndpoints
             if (!NameValidation.IsValidPathSegment(name))
                 return Results.BadRequest(new { error = NameValidation.Error("name") });
 
-            var s = await db.Storytellers.OrderBy(x => x.Id).FirstOrDefaultAsync();
+            var s = await db.Storytellers.Where(x => id == null || x.Id == id).OrderBy(x => x.Id).FirstOrDefaultAsync();
             if (s is null)
                 return Results.NotFound();
 

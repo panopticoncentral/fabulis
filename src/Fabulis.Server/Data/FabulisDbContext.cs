@@ -290,6 +290,7 @@ public class FabulisDbContext : DbContext
             """);
 
         await SeedDefaultStorytellerIfMissingAsync();
+        await SearchIndex.EnsureCreatedAsync(this);
     }
 
     private async Task SeedDefaultStorytellerIfMissingAsync()

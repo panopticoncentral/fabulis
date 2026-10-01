@@ -22,12 +22,23 @@ enum UIFixtures {
          "updatedAt": date, "storytellerName": "Storyteller", "modelName": "Sample model",
          "messages": messages]
     }
-    static func response(_ method: String, path: String) throws -> Data {
+    static func response(_ method: String, path: String, queryItems: [URLQueryItem] = []) throws -> Data {
         if path == "/settings", ProcessInfo.processInfo.arguments.contains("-ui-settings-failure") {
             throw APIError.server(status: 503, body: "The sample server is unavailable. Try again.")
         }
         let value: Any
         switch path {
+        case "/search":
+            let query = queryItems.first(where: { $0.name == "q" })?.value ?? ""
+            let matches = "lighthouse".hasPrefix(query.lowercased())
+            value = ["results": matches ? [[
+                "kind": "storyVersion", "entityId": 1, "itemId": 1,
+                "title": "The Lantern Keeper", "categoryId": 1, "categoryName": "Nightfall",
+                "versionNumber": 1, "snippet": "Write a quiet story about a \u{2}lighthouse\u{3} keeper.",
+                "matchInSummary": false
+            ]] : [], "hasMore": false]
+        case "/one-liners/1": value = ["id": 1, "categoryId": 1, "categoryName": "Nightfall", "text": "A letter in your own handwriting.", "createdAt": date, "updatedAt": date]
+        case "/tropes/1": value = ["id": 1, "categoryId": 1, "categoryName": "Nightfall", "text": "The reluctant guardian", "createdAt": date, "updatedAt": date]
         case "/library": value = ["categories": [category]]
         case "/drafts":
             if method == "POST" { value = draft(3) }

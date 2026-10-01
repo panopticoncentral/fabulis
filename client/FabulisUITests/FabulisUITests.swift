@@ -30,6 +30,28 @@ final class FabulisUITests: XCTestCase {
         add(attachment)
     }
 
+    @MainActor func testGlobalSearchOpensMatchingOlderVersion() {
+        let app = launch()
+        #if targetEnvironment(macCatalyst)
+        // Catalyst exposes the native toolbar label, not the SwiftUI identifier.
+        let searchButton = app.buttons["Search Everything"].firstMatch
+        #else
+        let searchButton = app.buttons["search-everything"].firstMatch
+        #endif
+        XCTAssertTrue(searchButton.waitForExistence(timeout: 10))
+        searchButton.activateElement()
+        let field = app.searchFields["Search all library content"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.activateElement()
+        field.typeText("lighthouse")
+        let result = app.buttons.containing(.staticText, identifier: "The Lantern Keeper").firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        capture("Global search results", app: app)
+        result.activateElement()
+        XCTAssertTrue(app.staticTexts["Version 1 · Nightfall"].firstMatch.waitForExistence(timeout: 5))
+        capture("Search opens matching version", app: app)
+    }
+
     @MainActor func testDraftCompositionSurvivesBrowsing() {
         let app = launch()
         XCTAssertTrue(app.staticTexts["Lantern draft"].firstMatch.waitForExistence(timeout: 10))

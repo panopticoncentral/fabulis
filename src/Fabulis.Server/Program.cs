@@ -62,6 +62,7 @@ app.Use(async (context, next) =>
 var api = app.MapGroup("/api/v1").DisableAntiforgery();
 api.MapAuthEndpoints();
 api.MapLibraryEndpoints();
+api.MapSearchEndpoints();
 api.MapStoryEndpoints();
 api.MapSettingsEndpoints();
 api.MapStorytellerEndpoints();

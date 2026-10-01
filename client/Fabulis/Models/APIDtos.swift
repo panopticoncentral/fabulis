@@ -339,3 +339,37 @@ struct GenerateTitleResponse: Decodable, Sendable {
 struct CreateCategoryRequest: Encodable, Sendable { let name: String }
 struct RenameCategoryRequest: Encodable, Sendable { let name: String }
 struct UpdateMessageRequest: Encodable, Sendable { let content: String }
+
+// MARK: - Global search
+struct SearchResponse: Codable {
+    let results: [SearchResult]
+    let hasMore: Bool
+}
+
+struct SearchResult: Codable, Identifiable, Hashable {
+    let kind: String
+    let entityId: Int
+    let itemId: Int
+    let title: String
+    let categoryId: Int?
+    let categoryName: String?
+    let versionNumber: Int?
+    let snippet: String
+    let matchInSummary: Bool
+    var id: String { "\(kind):\(entityId)" }
+
+    var kindLabel: String {
+        switch kind {
+        case "category": "Category"
+        case "story": "Story · Title and summary"
+        case "storyVersion": "Story · Version \(versionNumber ?? 1)"
+        case "draft": "Draft"
+        case "prompt": "Prompt"
+        case "oneLiner": "One-liner"
+        case "trope": "Trope"
+        case "storyteller": "Storyteller"
+        case "summaryPrompt": "Summary instructions"
+        default: "Library item"
+        }
+    }
+}

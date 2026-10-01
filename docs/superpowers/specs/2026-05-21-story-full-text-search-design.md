@@ -1,7 +1,9 @@
 # Full-text search over saved stories
 
 **Date:** 2026-05-21
-**Status:** Approved design
+**Status:** Superseded by the implemented [global search](../../full-text-search.md), which also searches drafts, resources, titles, summaries, categories, and writing instructions.
+
+The original story-only proposal is retained below for historical context.
 
 ## Goal
 

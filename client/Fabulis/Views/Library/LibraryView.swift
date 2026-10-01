@@ -20,6 +20,7 @@ struct LibraryView: View {
     @State private var createError: String?
     @State private var draftToOpen: Int?
     @State private var libraryRevision = 0
+    @State private var showingSearch = false
 
     private var tabSelection: Binding<LibraryTab> {
         Binding(get: { tab }, set: { newTab in appState.navigate { tab = newTab } })
@@ -45,6 +46,14 @@ struct LibraryView: View {
                 .interactiveDismissDisabled(appState.hasUnsavedChanges)
                 .frame(idealWidth: 620, idealHeight: 650)
         }
+        .sheet(isPresented: $showingSearch, onDismiss: { libraryRevision += 1 }) {
+            SearchView()
+                // Catalyst can create the sheet outside the presenting view's
+                // environment tree. Supply the same model explicitly.
+                .environment(appState)
+                .interactiveDismissDisabled(appState.hasUnsavedChanges)
+                .frame(idealWidth: 760, idealHeight: 720)
+        }
         .confirmationDialog("Discard changes?", isPresented: Binding(
             get: { appState.showingNavigationConfirmation },
             set: { appState.showingNavigationConfirmation = $0 }), titleVisibility: .visible) {
@@ -69,7 +78,8 @@ struct LibraryView: View {
     private func browser(kind: LibraryKind, active: Bool) -> some View {
         LibraryBrowser(initialKind: kind, isActive: active, creatingDraft: creatingDraft,
                        draftToOpen: draftToOpen, revision: libraryRevision,
-                       onLibraryChanged: { libraryRevision += 1 })
+                       onLibraryChanged: { libraryRevision += 1 },
+                       onSearch: { appState.navigate { showingSearch = true } })
     }
 
     private func createDraft() async {
@@ -91,17 +101,19 @@ private struct LibraryBrowser: View {
     let draftToOpen: Int?
     let revision: Int
     let onLibraryChanged: () -> Void
+    let onSearch: () -> Void
     @State private var selectedKind: LibraryKind
     @State private var selections: [LibraryKind: LibrarySelection] = [:]
     @State private var searches: [LibraryKind: String] = [:]
 
     init(initialKind: LibraryKind, isActive: Bool, creatingDraft: Bool, draftToOpen: Int?, revision: Int,
-         onLibraryChanged: @escaping () -> Void) {
+         onLibraryChanged: @escaping () -> Void, onSearch: @escaping () -> Void) {
         self.isActive = isActive
         self.creatingDraft = creatingDraft
         self.draftToOpen = draftToOpen
         self.revision = revision
         self.onLibraryChanged = onLibraryChanged
+        self.onSearch = onSearch
         _selectedKind = State(initialValue: initialKind)
     }
 
@@ -278,6 +290,12 @@ private struct LibraryBrowser: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button(action: onSearch) { Label("Search Everything", systemImage: "magnifyingglass") }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .help("Search everything (⇧⌘F)")
+                .accessibilityIdentifier("search-everything")
+        }
         ToolbarItem(placement: .primaryAction) {
             Button { appState.newDraftRequested = true } label: {
                 Label("New Draft", systemImage: "square.and.pencil")

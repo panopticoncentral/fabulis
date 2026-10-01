@@ -9,6 +9,12 @@ public static class TropeEndpoints
     {
         var group = routes.MapGroup("/tropes").RequireSession();
 
+        group.MapGet("/{id:int}", async (int id, TropeService tropes) =>
+        {
+            var item = await tropes.GetTropeAsync(id);
+            return item is null ? Results.NotFound() : Results.Ok(ToDto(item));
+        });
+
         group.MapPost("", async (CreateTropeRequest body, TropeService tropes) =>
         {
             if (string.IsNullOrWhiteSpace(body.Text))

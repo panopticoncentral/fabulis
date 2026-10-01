@@ -25,6 +25,13 @@ struct StoryView: View {
     }
     @State private var showingSummary = false
 
+    init(storyId: Int, fallbackTitle: String, initialVersion: Int? = nil, showSummary: Bool = false) {
+        self.storyId = storyId
+        self.fallbackTitle = fallbackTitle
+        _selectedVersion = State(initialValue: initialVersion)
+        _showingSummary = State(initialValue: showSummary)
+    }
+
     var body: some View {
         Group {
             if let detail {

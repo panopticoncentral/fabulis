@@ -225,6 +225,21 @@ actor FabulisAPIClient {
         try await requestVoid("DELETE", path: "/tropes/\(id)", authed: true)
     }
 
+    func search(query: String, offset: Int = 0) async throws -> SearchResponse {
+        try await request("GET", path: "/search", authed: true, queryItems: [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "offset", value: String(offset))
+        ])
+    }
+
+    func oneLiner(id: Int) async throws -> OneLinerDetail {
+        try await request("GET", path: "/one-liners/\(id)", authed: true)
+    }
+
+    func trope(id: Int) async throws -> TropeDetail {
+        try await request("GET", path: "/tropes/\(id)", authed: true)
+    }
+
     func story(id: Int) async throws -> StoryDetail {
         try await request("GET", path: "/stories/\(id)", authed: true)
     }
@@ -372,12 +387,12 @@ actor FabulisAPIClient {
         try await request("GET", path: "/models", authed: true)
     }
 
-    func getStoryteller() async throws -> StorytellerDto {
-        try await request("GET", path: "/storyteller", authed: true)
+    func getStoryteller(id: Int? = nil) async throws -> StorytellerDto {
+        try await request("GET", path: "/storyteller", authed: true, queryItems: id.map { [URLQueryItem(name: "id", value: String($0))] } ?? [])
     }
 
-    func updateStoryteller(_ body: StorytellerUpdateRequest) async throws {
-        try await requestVoid("PUT", path: "/storyteller", body: body, authed: true)
+    func updateStoryteller(_ body: StorytellerUpdateRequest, id: Int? = nil) async throws {
+        try await requestVoid("PUT", path: "/storyteller", body: body, authed: true, queryItems: id.map { [URLQueryItem(name: "id", value: String($0))] } ?? [])
     }
 
     func generateTitle(draftId: Int) async throws -> String {
@@ -491,15 +506,15 @@ actor FabulisAPIClient {
         return data
     }
 
-    private func request<T: Decodable>(_ method: String, path: String, authed: Bool, timeout: TimeInterval? = nil) async throws -> T {
-        return try await request(method, path: path, body: Optional<EmptyBody>.none, authed: authed, timeout: timeout)
+    private func request<T: Decodable>(_ method: String, path: String, authed: Bool, timeout: TimeInterval? = nil, queryItems: [URLQueryItem] = []) async throws -> T {
+        return try await request(method, path: path, body: Optional<EmptyBody>.none, authed: authed, timeout: timeout, queryItems: queryItems)
     }
 
-    private func request<T: Decodable, B: Encodable>(_ method: String, path: String, body: B?, authed: Bool, timeout: TimeInterval? = nil) async throws -> T {
+    private func request<T: Decodable, B: Encodable>(_ method: String, path: String, body: B?, authed: Bool, timeout: TimeInterval? = nil, queryItems: [URLQueryItem] = []) async throws -> T {
         #if DEBUG
-        if UIFixtures.enabled { return try decoder.decode(T.self, from: UIFixtures.response(method, path: path)) }
+        if UIFixtures.enabled { return try decoder.decode(T.self, from: UIFixtures.response(method, path: path, queryItems: queryItems)) }
         #endif
-        var req = try await buildRequest(method: method, path: path, body: body, authed: authed)
+        var req = try await buildRequest(method: method, path: path, body: body, authed: authed, queryItems: queryItems)
         if let timeout { req.timeoutInterval = timeout }
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
@@ -515,11 +530,11 @@ actor FabulisAPIClient {
         try validate(response: response, data: data)
     }
 
-    private func requestVoid<B: Encodable>(_ method: String, path: String, body: B, authed: Bool) async throws {
+    private func requestVoid<B: Encodable>(_ method: String, path: String, body: B, authed: Bool, queryItems: [URLQueryItem] = []) async throws {
         #if DEBUG
         if UIFixtures.enabled { return }
         #endif
-        let req = try await buildRequest(method: method, path: path, body: body, authed: authed)
+        let req = try await buildRequest(method: method, path: path, body: body, authed: authed, queryItems: queryItems)
         let (data, response) = try await transport(req)
         try validate(response: response, data: data)
     }
@@ -528,7 +543,7 @@ actor FabulisAPIClient {
         try await buildRequest(method: method, path: path, body: Optional<EmptyBody>.none, authed: authed)
     }
 
-    private func buildRequest<B: Encodable>(method: String, path: String, body: B?, authed: Bool) async throws -> URLRequest {
+    private func buildRequest<B: Encodable>(method: String, path: String, body: B?, authed: Bool, queryItems: [URLQueryItem] = []) async throws -> URLRequest {
         #if DEBUG
         if UIFixtures.enabled { throw APIError.server(status: 501, body: "This action is unavailable in UI fixtures.") }
         #endif
@@ -536,6 +551,7 @@ actor FabulisAPIClient {
         guard var components = URLComponents(string: serverURL) else { throw APIError.invalidURL }
         let trimmedExisting = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
         components.path = trimmedExisting + "/api/v1" + path
+        components.queryItems = queryItems.isEmpty ? nil : queryItems
         guard let url = components.url else { throw APIError.invalidURL }
 
         var req = URLRequest(url: url)

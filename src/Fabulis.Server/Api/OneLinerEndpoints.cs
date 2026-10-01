@@ -9,6 +9,12 @@ public static class OneLinerEndpoints
     {
         var group = routes.MapGroup("/one-liners").RequireSession();
 
+        group.MapGet("/{id:int}", async (int id, OneLinerService oneLiners) =>
+        {
+            var item = await oneLiners.GetOneLinerAsync(id);
+            return item is null ? Results.NotFound() : Results.Ok(ToDto(item));
+        });
+
         group.MapPost("", async (CreateOneLinerRequest body, OneLinerService oneLiners) =>
         {
             if (string.IsNullOrWhiteSpace(body.Text))
