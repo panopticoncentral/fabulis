@@ -20,6 +20,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fabulis.Cli\Fabulis.Cli.csproj" />
+    <ProjectReference Include="..\..\src\Fabulis.Library\Fabulis.Library.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Fixtures\conversation-body.json" Link="Fixtures\conversation-body.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
